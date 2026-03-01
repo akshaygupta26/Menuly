@@ -80,7 +80,7 @@ export function RecipeCard({ recipe, onToggleFavorite }: RecipeCardProps) {
         </div>
       </CardHeader>
 
-      <CardFooter className="gap-4 text-muted-foreground text-xs">
+      <CardFooter className="flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-xs">
         {totalTime !== null && (
           <span className="inline-flex items-center gap-1">
             <Clock className="size-3.5" />
