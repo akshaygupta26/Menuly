@@ -97,7 +97,7 @@ export function AppShell({ children }: AppShellProps) {
               )}
             >
               <item.icon className="size-5" />
-              <span>{item.label}</span>
+              <span className="truncate">{item.label}</span>
             </Link>
           );
         })}

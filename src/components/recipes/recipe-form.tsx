@@ -280,7 +280,7 @@ export function RecipeForm({
             type="button"
             variant="outline"
             size="sm"
-            disabled={isCalculating}
+            disabled={isCalculating || isLoading}
             onClick={async () => {
               const currentIngredients = watch("ingredients");
               const filtered = currentIngredients.filter(
@@ -413,6 +413,9 @@ export function RecipeForm({
             No ingredients added yet. Click &quot;Add ingredient&quot; above.
           </p>
         )}
+        <p className="text-xs text-muted-foreground">
+          Ingredients with empty names will be removed on save.
+        </p>
       </div>
 
       {/* Instructions */}
@@ -424,9 +427,14 @@ export function RecipeForm({
           rows={6}
           {...register("instructions")}
         />
-        <p className="text-xs text-muted-foreground">
-          One step per line. They will be displayed as numbered steps.
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            One step per line. They will be displayed as numbered steps.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {(watch("instructions") || "").split("\n").filter((l: string) => l.trim()).length} step{(watch("instructions") || "").split("\n").filter((l: string) => l.trim()).length !== 1 ? "s" : ""}
+          </p>
+        </div>
       </div>
 
       {/* Tags */}

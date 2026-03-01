@@ -69,9 +69,9 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
         return;
       }
       toast.success("Marked as made!");
-      setMadeOpen(false);
       setRating("");
       setMadeNotes("");
+      setMadeOpen(false);
       router.refresh();
     });
   }

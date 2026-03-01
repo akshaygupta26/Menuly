@@ -157,8 +157,16 @@ export function RecipePickerDialog({
             {/* Recipe list */}
             <ScrollArea className="h-[300px]">
               {isPending ? (
-                <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-                  Loading recipes...
+                <div className="space-y-2 py-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-md px-3 py-2">
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+                        <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
+                      </div>
+                      <div className="h-4 w-8 animate-pulse rounded bg-muted" />
+                    </div>
+                  ))}
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
@@ -204,8 +212,16 @@ export function RecipePickerDialog({
               )}
             </ScrollArea>
 
-            {/* Custom entry toggle */}
-            <div className="border-t border-border pt-3">
+            {/* Quick actions */}
+            <div className="border-t border-border pt-3 space-y-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-muted-foreground"
+                onClick={() => onSelect(null, "Skip")}
+              >
+                Skip this meal
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"

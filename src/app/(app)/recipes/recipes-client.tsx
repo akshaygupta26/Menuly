@@ -89,6 +89,13 @@ export function RecipeListClient({ recipes: initial }: RecipeListClientProps) {
     <div className="space-y-6">
       <RecipeFiltersBar filters={filters} onChange={setFilters} />
 
+      {/* Result count when filters are active */}
+      {(filters.search || filters.cuisineType || filters.proteinType || filters.mealType || filters.favoritesOnly) && filtered.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Showing {filtered.length} of {recipes.length} recipe{recipes.length !== 1 ? "s" : ""}
+        </p>
+      )}
+
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
           <UtensilsCrossed className="size-12 text-muted-foreground/40" />

@@ -129,7 +129,13 @@ export default function LoginPage() {
             </span>
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">
-            Welcome to Menuly
+            {mode === "signup"
+              ? "Create Account"
+              : mode === "forgot-password"
+                ? "Reset Password"
+                : mode === "magic-link"
+                  ? "Sign In with Email Link"
+                  : "Welcome to Menuly"}
           </CardTitle>
           <CardDescription>
             {mode === "signup"

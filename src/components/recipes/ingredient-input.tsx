@@ -64,7 +64,7 @@ export function IngredientInput({
           setValue?.(`ingredients.${index}.category`, value)
         }
       >
-        <SelectTrigger size="sm" className="w-[120px] shrink-0">
+        <SelectTrigger size="sm" className="w-[130px] sm:w-[140px] shrink-0">
           <SelectValue placeholder="Category" />
         </SelectTrigger>
         <SelectContent>

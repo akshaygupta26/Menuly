@@ -128,9 +128,15 @@ function itemsReducer(items: GroceryItem[], action: OptimisticAction): GroceryIt
 
 export function GroceryListView({ initialList, initialItems }: GroceryListViewProps) {
   const [items, dispatchOptimistic] = useOptimistic(initialItems, itemsReducer);
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<IngredientCategory>>(
-    new Set()
-  );
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<IngredientCategory>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const saved = localStorage.getItem(`grocery-collapsed-${initialList.id}`);
+      return saved ? new Set(JSON.parse(saved) as IngredientCategory[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [isPending, startTransition] = useTransition();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
@@ -187,9 +193,15 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
       } else {
         next.add(category);
       }
+      try {
+        localStorage.setItem(
+          `grocery-collapsed-${initialList.id}`,
+          JSON.stringify([...next])
+        );
+      } catch { /* ignore storage errors */ }
       return next;
     });
-  }, []);
+  }, [initialList.id]);
 
   const handleToggle = useCallback(
     (itemId: string) => {

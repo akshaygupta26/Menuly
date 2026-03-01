@@ -58,6 +58,7 @@ export function AddItemInput({ onAdd }: AddItemInputProps) {
         onChange={(e) => setName(e.target.value)}
         placeholder="Add an item..."
         className="flex-1"
+        maxLength={100}
       />
       <Select
         value={category}
