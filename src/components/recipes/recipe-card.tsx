@@ -42,7 +42,7 @@ export function RecipeCard({ recipe, onToggleFavorite }: RecipeCardProps) {
           <Button
             variant="ghost"
             size="icon-sm"
-            className="relative z-10"
+            className="relative z-10 size-9 min-h-[36px] min-w-[36px]"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();

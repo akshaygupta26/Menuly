@@ -173,7 +173,8 @@ export function RecipeDetailClient({ recipe }: RecipeDetailClientProps) {
           <DialogHeader>
             <DialogTitle>Delete Recipe</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete &quot;{recipe.name}&quot;? This
+              Are you sure you want to delete{" "}
+              <strong className="text-foreground">{recipe.name}</strong>? This
               action cannot be undone.
             </DialogDescription>
           </DialogHeader>

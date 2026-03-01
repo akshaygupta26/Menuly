@@ -64,7 +64,6 @@ function formatIngredient(ing: RecipeIngredient): string {
 
   let text = parts.join(" ");
   if (ing.notes) text += ` (${ing.notes})`;
-  if (ing.is_optional) text += " [optional]";
 
   return text;
 }
@@ -154,23 +153,23 @@ export default async function RecipeDetailPage({
 
         {/* Nutrition badges */}
         {recipe.calories != null && (
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-orange-50 px-2.5 py-1 text-sm font-medium text-orange-700 dark:bg-orange-950 dark:text-orange-300">
-              <Flame className="size-3.5" />
+          <div className="flex flex-wrap items-center gap-3" role="list" aria-label="Nutrition per serving">
+            <span role="listitem" aria-label={`${recipe.calories} calories per serving`} className="inline-flex items-center gap-1.5 rounded-md bg-orange-50 px-2.5 py-1 text-sm font-medium text-orange-700 dark:bg-orange-950 dark:text-orange-300">
+              <Flame className="size-3.5" aria-hidden="true" />
               {recipe.calories} kcal
             </span>
             {recipe.protein_g != null && (
-              <span className="rounded-md bg-blue-50 px-2.5 py-1 text-sm font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              <span role="listitem" aria-label={`${recipe.protein_g} grams protein per serving`} className="rounded-md bg-blue-50 px-2.5 py-1 text-sm font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                 {recipe.protein_g}g protein
               </span>
             )}
             {recipe.carbs_g != null && (
-              <span className="rounded-md bg-amber-50 px-2.5 py-1 text-sm font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+              <span role="listitem" aria-label={`${recipe.carbs_g} grams carbs per serving`} className="rounded-md bg-amber-50 px-2.5 py-1 text-sm font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                 {recipe.carbs_g}g carbs
               </span>
             )}
             {recipe.fat_g != null && (
-              <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-sm font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+              <span role="listitem" aria-label={`${recipe.fat_g} grams fat per serving`} className="rounded-md bg-emerald-50 px-2.5 py-1 text-sm font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                 {recipe.fat_g}g fat
               </span>
             )}
@@ -226,6 +225,11 @@ export default async function RecipeDetailPage({
                             }
                           >
                             {formatIngredient(ing)}
+                            {ing.is_optional && (
+                              <span className="ml-1.5 inline-block rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground align-middle">
+                                optional
+                              </span>
+                            )}
                           </span>
                         </li>
                       ))}

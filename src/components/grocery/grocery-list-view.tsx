@@ -14,6 +14,14 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AddItemInput } from "@/components/grocery/add-item-input";
 import type { GroceryList, GroceryItem, IngredientCategory } from "@/types/database";
 
@@ -124,6 +132,7 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
     new Set()
   );
   const [isPending, startTransition] = useTransition();
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // ---- Realtime subscription ----
   useEffect(() => {
@@ -338,7 +347,7 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
           <Button
             variant="outline"
             size="sm"
-            onClick={handleClearChecked}
+            onClick={() => setShowClearConfirm(true)}
             disabled={isPending}
           >
             <Trash2 className="size-4" />
@@ -346,6 +355,36 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
           </Button>
         </div>
       )}
+
+      <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear checked items?</DialogTitle>
+            <DialogDescription>
+              This will remove {checkedCount} checked item
+              {checkedCount !== 1 ? "s" : ""} from your grocery list. This
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowClearConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setShowClearConfirm(false);
+                handleClearChecked();
+              }}
+            >
+              Clear Items
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

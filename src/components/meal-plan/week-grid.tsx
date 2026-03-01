@@ -285,7 +285,7 @@ export function WeekGrid({
             {/* Day header */}
             <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-2">
               <span className="text-sm font-semibold">
-                {format(date, "EEEE")}
+                {format(date, "EEE")}
               </span>
               <span className="text-xs text-muted-foreground">
                 {format(date, "MMM d")}
@@ -301,7 +301,7 @@ export function WeekGrid({
                     key={`${dayOfWeek}-${slot}`}
                     className="flex items-center gap-3 px-3 py-2"
                   >
-                    <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+                    <span className="w-14 shrink-0 text-[11px] sm:text-xs font-medium text-muted-foreground">
                       {SLOT_LABELS[slot]}
                     </span>
                     <div className="min-w-0 flex-1">

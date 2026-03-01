@@ -121,7 +121,7 @@ export default function SettingsPage() {
       await navigator.clipboard.writeText(text);
       setCopiedField(field);
       toast.success("Copied to clipboard");
-      setTimeout(() => setCopiedField(null), 2000);
+      setTimeout(() => setCopiedField(null), 3000);
     } catch {
       toast.error("Failed to copy to clipboard");
     }
@@ -158,6 +158,7 @@ export default function SettingsPage() {
             </CardTitle>
             <CardDescription>
               Choose which meal slots to include in your weekly meal plans.
+              Defaults are Breakfast, Lunch, and Dinner.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -243,7 +244,7 @@ export default function SettingsPage() {
               <Label>Auth Token</Label>
               {accessToken ? (
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 rounded-md border bg-muted/50 px-3 py-2 text-xs break-all font-mono max-h-20 overflow-y-auto">
+                  <code className="flex-1 rounded-md border bg-muted/50 px-3 py-2 text-xs break-all font-mono max-h-20 overflow-y-auto overflow-x-hidden">
                     {accessToken}
                   </code>
                   <Button
