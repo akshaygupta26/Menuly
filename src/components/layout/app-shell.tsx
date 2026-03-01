@@ -76,7 +76,7 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Main Content */}
       <main className="flex-1 md:pl-60">
-        <div className="mx-auto max-w-4xl px-4 py-6 pb-24 md:px-8 md:py-8 md:pb-8">
+        <div className="mx-auto max-w-4xl px-4 py-6 pb-28 md:px-8 md:py-8 md:pb-8">
           {children}
         </div>
       </main>
@@ -90,13 +90,13 @@ export function AppShell({ children }: AppShellProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 py-2 pt-2.5 text-[11px] font-medium transition-colors",
+                "flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium transition-colors",
                 active
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <item.icon className="size-5" />
+              <item.icon className="size-6" />
               <span className="truncate">{item.label}</span>
             </Link>
           );
