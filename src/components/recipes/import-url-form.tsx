@@ -67,9 +67,24 @@ export function ImportUrlForm({ onImport }: ImportUrlFormProps) {
       const data: ImportedRecipeData = await response.json();
       onImport(data);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to import recipe."
-      );
+      const raw = err instanceof Error ? err.message : "";
+      // Map technical errors to user-friendly messages
+      let friendly: string;
+      if (raw.includes("Could not reach")) {
+        friendly =
+          "Couldn't reach that website. Check the URL and try again.";
+      } else if (raw.includes("No recipe data found")) {
+        friendly =
+          "No recipe found on that page. Try pasting the direct link to a recipe (not a search or category page).";
+      } else if (raw.includes("Failed to fetch") || raw.includes("422")) {
+        friendly =
+          "This page doesn't have recipe data we can read. Try a different recipe URL.";
+      } else if (raw.includes("Invalid URL")) {
+        friendly = "That doesn't look like a valid URL. Please check and try again.";
+      } else {
+        friendly = raw || "Something went wrong importing this recipe. Please try again.";
+      }
+      setError(friendly);
     } finally {
       setIsLoading(false);
     }

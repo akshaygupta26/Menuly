@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { addDays, format, parseISO } from "date-fns";
-import { Plus, X, Sparkles, Lock, Unlock, ShoppingCart } from "lucide-react";
+import { Plus, X, Sparkles, Lock, Unlock, ShoppingCart, CalendarDays } from "lucide-react";
 
 import type { MealPlan, MealPlanItemWithRecipe, MealType } from "@/types/database";
 import { cn } from "@/lib/utils";
@@ -210,6 +210,18 @@ export function WeekGrid({
           </>
         )}
       </div>
+
+      {/* Empty state guidance */}
+      {!isFinalized && (!mealPlan?.items || mealPlan.items.length === 0) && (
+        <div className="rounded-lg border border-dashed border-border bg-muted/30 px-6 py-8 text-center">
+          <CalendarDays className="mx-auto mb-3 size-10 text-muted-foreground/50" />
+          <h3 className="mb-1 text-sm font-semibold">No meals planned yet</h3>
+          <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+            Tap the <strong>+</strong> button on any slot below to add a recipe, or use{" "}
+            <strong>Auto-Generate</strong> to fill the whole week from your recipe library.
+          </p>
+        </div>
+      )}
 
       {/* ----------------------------------------------------------------- */}
       {/* Desktop grid (hidden on mobile) */}

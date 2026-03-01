@@ -18,6 +18,15 @@ import {
 import { generateGroceryList } from "@/actions/grocery";
 import { WeekGrid } from "@/components/meal-plan/week-grid";
 import { RecipePickerDialog } from "@/components/meal-plan/recipe-picker-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,6 +69,8 @@ export function MealPlanClient({
   useEffect(() => {
     setMealPlan(initialMealPlan);
   }, [initialMealPlan]);
+
+  const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
 
   const [picker, setPicker] = useState<PickerState>({
     open: false,
@@ -115,7 +126,12 @@ export function MealPlanClient({
   }
 
   function handleFinalize() {
+    setShowFinalizeConfirm(true);
+  }
+
+  function confirmFinalize() {
     if (!mealPlan) return;
+    setShowFinalizeConfirm(false);
     startTransition(async () => {
       const { error } = await finalizeMealPlan(mealPlan!.id);
 
@@ -207,6 +223,27 @@ export function MealPlanClient({
         onSelect={handleSelectRecipe}
         mealSlot={picker.mealSlot}
       />
+
+      <Dialog open={showFinalizeConfirm} onOpenChange={setShowFinalizeConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Finalize this week?</DialogTitle>
+            <DialogDescription>
+              Finalizing locks the meal plan so you can generate a grocery list.
+              You can unfinalize later if you need to make changes.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowFinalizeConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={confirmFinalize}>Finalize</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
