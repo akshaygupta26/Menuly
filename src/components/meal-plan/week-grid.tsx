@@ -8,6 +8,12 @@ import type { MealPlan, MealPlanItemWithRecipe, MealType } from "@/types/databas
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,6 +30,7 @@ interface WeekGridProps {
   onAddItem: (dayOfWeek: number, mealSlot: MealType) => void;
   onRemoveItem: (itemId: string) => void;
   onClearAll: () => void;
+  onClearSlot: (slot: MealType) => void;
   onFinalize: () => void;
   onUnfinalize: () => void;
   onAutoGenerate: () => void;
@@ -139,6 +146,7 @@ export function WeekGrid({
   onAddItem,
   onRemoveItem,
   onClearAll,
+  onClearSlot,
   onFinalize,
   onUnfinalize,
   onAutoGenerate,
@@ -174,16 +182,41 @@ export function WeekGrid({
         </Button>
 
         {!isFinalized && mealPlan?.items && mealPlan.items.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClearAll}
-            disabled={isPending}
-            className="text-destructive"
-          >
-            <Trash2 className="size-3.5" />
-            Clear All
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isPending}
+                className="text-destructive"
+              >
+                <Trash2 className="size-3.5" />
+                Clear
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {mealSlots.map((slot) => {
+                const count = mealPlan.items.filter((i) => i.meal_slot === slot).length;
+                if (count === 0) return null;
+                return (
+                  <DropdownMenuItem
+                    key={slot}
+                    onClick={() => onClearSlot(slot)}
+                  >
+                    All {SLOT_LABELS[slot]}
+                    <span className="ml-auto text-xs text-muted-foreground">{count}</span>
+                  </DropdownMenuItem>
+                );
+              })}
+              <DropdownMenuItem
+                onClick={onClearAll}
+                className="text-destructive focus:text-destructive"
+              >
+                Clear Entire Week
+                <span className="ml-auto text-xs text-muted-foreground">{mealPlan.items.length}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
 
         {isFinalized ? (

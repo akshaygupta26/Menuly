@@ -13,6 +13,7 @@ import {
   addMealPlanItem,
   removeMealPlanItem,
   clearAllMealPlanItems,
+  clearMealPlanSlot,
   finalizeMealPlan,
   unfinalizeMealPlan,
 } from "@/actions/meal-plans";
@@ -180,6 +181,19 @@ export function MealPlanClient({
     });
   }
 
+  function handleClearSlot(slot: MealType) {
+    if (!mealPlan) return;
+    startTransition(async () => {
+      const { error } = await clearMealPlanSlot(mealPlan!.id, slot);
+      if (error) {
+        toast.error(error);
+        return;
+      }
+      toast.success(`Cleared all ${slot} meals.`);
+      router.refresh();
+    });
+  }
+
   function handleAutoGenerate() {
     if (!mealPlan) return;
     startTransition(async () => {
@@ -231,6 +245,7 @@ export function MealPlanClient({
         onAddItem={handleOpenPicker}
         onRemoveItem={handleRemoveItem}
         onClearAll={handleClearAll}
+        onClearSlot={handleClearSlot}
         onFinalize={handleFinalize}
         onUnfinalize={handleUnfinalize}
         onAutoGenerate={handleAutoGenerate}

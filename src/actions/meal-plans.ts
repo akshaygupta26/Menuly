@@ -448,7 +448,54 @@ export async function clearAllMealPlanItems(
 }
 
 // ---------------------------------------------------------------------------
-// 8. getRecipesForPicker
+// 8. clearMealPlanSlot
+// ---------------------------------------------------------------------------
+
+/**
+ * Remove all items for a specific meal slot (e.g. all breakfasts) from a meal plan.
+ */
+export async function clearMealPlanSlot(
+  mealPlanId: string,
+  mealSlot: MealType
+): Promise<ActionResult> {
+  const { supabase, user } = await getAuthenticatedUser();
+  if (!supabase || !user) {
+    return { data: null, error: "Not authenticated" };
+  }
+
+  // Verify ownership
+  const { data: plan, error: planError } = await supabase
+    .from("meal_plans")
+    .select("id, status")
+    .eq("id", mealPlanId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (planError || !plan) {
+    return { data: null, error: "Meal plan not found" };
+  }
+
+  if (plan.status === "finalized") {
+    return { data: null, error: "Cannot modify a finalized meal plan" };
+  }
+
+  const { error: deleteError } = await supabase
+    .from("meal_plan_items")
+    .delete()
+    .eq("meal_plan_id", mealPlanId)
+    .eq("meal_slot", mealSlot);
+
+  if (deleteError) {
+    return { data: null, error: deleteError.message };
+  }
+
+  revalidatePath("/meal-plan");
+
+  return { data: null, error: null };
+}
+
+// ---------------------------------------------------------------------------
+// 9. getRecipesForPicker
 // ---------------------------------------------------------------------------
 
 /**
