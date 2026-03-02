@@ -29,6 +29,9 @@ export interface Profile {
   id: string;
   user_id: string;
   meal_slots: MealType[];
+  ai_generation_count: number;
+  ai_generation_reset_at: string;
+  ai_unlimited: boolean;
   created_at: string;
   updated_at: string;
 }

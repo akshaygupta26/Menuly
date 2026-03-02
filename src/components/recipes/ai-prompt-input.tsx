@@ -36,12 +36,21 @@ export function AiPromptInput({ onGenerated }: AiPromptInputProps) {
       const json = await res.json();
 
       if (!res.ok) {
-        toast.error(json.error || "Failed to generate recipe");
+        if (res.status === 429) {
+          toast.error("Daily limit reached. You can generate 3 recipes per day.");
+        } else {
+          toast.error(json.error || "Failed to generate recipe");
+        }
         return;
       }
 
       onGenerated(json.data);
-      toast.success("Recipe generated! Review and edit below.");
+      const remaining = json.remaining as number | null;
+      if (remaining !== null && remaining !== undefined) {
+        toast.success(`Recipe generated! ${remaining} generation${remaining === 1 ? "" : "s"} remaining today.`);
+      } else {
+        toast.success("Recipe generated! Review and edit below.");
+      }
     } catch {
       toast.error("Something went wrong. Please try again.");
     } finally {

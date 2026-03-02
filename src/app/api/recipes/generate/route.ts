@@ -63,6 +63,45 @@ export async function POST(request: Request) {
       );
     }
 
+    // Rate-limit check
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("ai_generation_count, ai_generation_reset_at, ai_unlimited")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return NextResponse.json(
+        { error: "Could not load profile" },
+        { status: 500 }
+      );
+    }
+
+    const DAILY_LIMIT = 3;
+    let currentCount = profile.ai_generation_count as number;
+
+    if (!profile.ai_unlimited) {
+      const resetAt = new Date(profile.ai_generation_reset_at as string);
+      const now = new Date();
+      const msIn24h = 24 * 60 * 60 * 1000;
+
+      // Reset window if 24 hours have elapsed
+      if (now.getTime() - resetAt.getTime() >= msIn24h) {
+        await supabase
+          .from("profiles")
+          .update({ ai_generation_count: 0, ai_generation_reset_at: now.toISOString() })
+          .eq("user_id", user.id);
+        currentCount = 0;
+      }
+
+      if (currentCount >= DAILY_LIMIT) {
+        return NextResponse.json(
+          { error: "Daily limit reached. You can generate 3 recipes per day." },
+          { status: 429 }
+        );
+      }
+    }
+
     // Validate input
     const body = await request.json();
     const prompt = body.prompt;
@@ -196,7 +235,17 @@ export async function POST(request: Request) {
       nutrition_source: "",
     };
 
-    return NextResponse.json({ data: formValues });
+    // Increment generation count after successful generation
+    if (!profile.ai_unlimited) {
+      await supabase
+        .from("profiles")
+        .update({ ai_generation_count: currentCount + 1 })
+        .eq("user_id", user.id);
+    }
+
+    const remaining = profile.ai_unlimited ? null : DAILY_LIMIT - (currentCount + 1);
+
+    return NextResponse.json({ data: formValues, remaining });
   } catch (err) {
     console.error("Error generating recipe:", err);
     return NextResponse.json(
