@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { Search, UtensilsCrossed, Pen } from "lucide-react";
 
 import type { MealType } from "@/types/database";
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 
 // ---------------------------------------------------------------------------
-// Types
+// Types & constants
 // ---------------------------------------------------------------------------
 
 interface PickerRecipe {
@@ -39,6 +39,13 @@ interface RecipePickerDialogProps {
   mealSlot: MealType;
 }
 
+const MEAL_TYPE_LABELS: Record<MealType, string> = {
+  breakfast: "Breakfast",
+  lunch: "Lunch",
+  dinner: "Dinner",
+  snack: "Snack",
+};
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -51,33 +58,43 @@ export function RecipePickerDialog({
 }: RecipePickerDialogProps) {
   const [recipes, setRecipes] = useState<PickerRecipe[]>([]);
   const [search, setSearch] = useState("");
+  const [mealTypeFilter, setMealTypeFilter] = useState<MealType | null>(null);
   const [isCustom, setIsCustom] = useState(false);
   const [customName, setCustomName] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  // Fetch recipes when dialog opens
+  // Fetch ALL recipes when dialog opens (no server-side meal type filter)
   const fetchRecipes = useCallback(() => {
     startTransition(async () => {
-      const { data, error } = await getRecipesForPicker(undefined, mealSlot);
+      const { data, error } = await getRecipesForPicker();
       if (!error && data) {
         setRecipes(data);
       }
     });
-  }, [mealSlot]);
+  }, []);
 
   useEffect(() => {
     if (open) {
       fetchRecipes();
       setSearch("");
+      setMealTypeFilter(null);
       setIsCustom(false);
       setCustomName("");
     }
   }, [open, fetchRecipes]);
 
-  // Filter recipes by search term
-  const filtered = recipes.filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter recipes by search term + optional meal type
+  const filtered = useMemo(() => {
+    let list = recipes;
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter((r) => r.name.toLowerCase().includes(q));
+    }
+    if (mealTypeFilter) {
+      list = list.filter((r) => r.meal_type.includes(mealTypeFilter));
+    }
+    return list;
+  }, [recipes, search, mealTypeFilter]);
 
   function handlePickRecipe(recipe: PickerRecipe) {
     onSelect(recipe.id, recipe.name);
@@ -154,6 +171,27 @@ export function RecipePickerDialog({
               />
             </div>
 
+            {/* Meal type filter chips */}
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.keys(MEAL_TYPE_LABELS) as MealType[]).map((mt) => (
+                <button
+                  key={mt}
+                  type="button"
+                  onClick={() =>
+                    setMealTypeFilter((prev) => (prev === mt ? null : mt))
+                  }
+                  className={cn(
+                    "rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors",
+                    mealTypeFilter === mt
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  {MEAL_TYPE_LABELS[mt]}
+                </button>
+              ))}
+            </div>
+
             {/* Recipe list */}
             <ScrollArea className="h-[300px]">
               {isPending ? (
@@ -172,8 +210,8 @@ export function RecipePickerDialog({
                 <div className="flex flex-col items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
                   <UtensilsCrossed className="size-8 opacity-40" />
                   <span>
-                    {search
-                      ? "No recipes match your search."
+                    {search || mealTypeFilter
+                      ? "No recipes match your filters."
                       : "No recipes found."}
                   </span>
                 </div>
