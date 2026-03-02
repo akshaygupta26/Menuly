@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { addDays, format, parseISO } from "date-fns";
-import { Plus, X, Sparkles, Lock, Unlock, ShoppingCart, CalendarDays } from "lucide-react";
+import { Plus, X, Sparkles, Lock, Unlock, ShoppingCart, CalendarDays, Trash2 } from "lucide-react";
 
 import type { MealPlan, MealPlanItemWithRecipe, MealType } from "@/types/database";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ interface WeekGridProps {
   mealSlots: MealType[];
   onAddItem: (dayOfWeek: number, mealSlot: MealType) => void;
   onRemoveItem: (itemId: string) => void;
+  onClearAll: () => void;
   onFinalize: () => void;
   onUnfinalize: () => void;
   onAutoGenerate: () => void;
@@ -137,6 +138,7 @@ export function WeekGrid({
   mealSlots,
   onAddItem,
   onRemoveItem,
+  onClearAll,
   onFinalize,
   onUnfinalize,
   onAutoGenerate,
@@ -170,6 +172,19 @@ export function WeekGrid({
           <Sparkles className="size-3.5" />
           Auto-Generate
         </Button>
+
+        {!isFinalized && mealPlan?.items && mealPlan.items.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClearAll}
+            disabled={isPending}
+            className="text-destructive"
+          >
+            <Trash2 className="size-3.5" />
+            Clear All
+          </Button>
+        )}
 
         {isFinalized ? (
           <Button

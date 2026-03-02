@@ -12,6 +12,7 @@ import type {
 import {
   addMealPlanItem,
   removeMealPlanItem,
+  clearAllMealPlanItems,
   finalizeMealPlan,
   unfinalizeMealPlan,
 } from "@/actions/meal-plans";
@@ -71,6 +72,7 @@ export function MealPlanClient({
   }, [initialMealPlan]);
 
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
 
   const [picker, setPicker] = useState<PickerState>({
     open: false,
@@ -160,6 +162,24 @@ export function MealPlanClient({
     });
   }
 
+  function handleClearAll() {
+    setShowClearAllConfirm(true);
+  }
+
+  function confirmClearAll() {
+    if (!mealPlan) return;
+    setShowClearAllConfirm(false);
+    startTransition(async () => {
+      const { error } = await clearAllMealPlanItems(mealPlan!.id);
+      if (error) {
+        toast.error(error);
+        return;
+      }
+      toast.success("All meals cleared.");
+      router.refresh();
+    });
+  }
+
   function handleAutoGenerate() {
     if (!mealPlan) return;
     startTransition(async () => {
@@ -210,6 +230,7 @@ export function MealPlanClient({
         mealSlots={mealSlots}
         onAddItem={handleOpenPicker}
         onRemoveItem={handleRemoveItem}
+        onClearAll={handleClearAll}
         onFinalize={handleFinalize}
         onUnfinalize={handleUnfinalize}
         onAutoGenerate={handleAutoGenerate}
@@ -241,6 +262,29 @@ export function MealPlanClient({
               Cancel
             </Button>
             <Button onClick={confirmFinalize}>Finalize</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showClearAllConfirm} onOpenChange={setShowClearAllConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear all meals?</DialogTitle>
+            <DialogDescription>
+              This will remove all {mealPlan?.items?.length ?? 0} meals from this
+              week&apos;s plan. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowClearAllConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmClearAll}>
+              Clear All
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
