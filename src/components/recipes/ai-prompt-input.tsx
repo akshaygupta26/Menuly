@@ -113,6 +113,8 @@ export function AiPromptInput({ onGenerated }: AiPromptInputProps) {
             setStreamedText((prev) => prev + (event.token as string));
           } else if (event.done) {
             onGenerated(event.data as Partial<RecipeFormValues>);
+            // Auto-dismiss preview so user focuses on the populated form
+            setStreamedText("");
             const remaining = event.remaining as number | null;
             if (remaining !== null && remaining !== undefined) {
               toast.success(
@@ -143,7 +145,7 @@ export function AiPromptInput({ onGenerated }: AiPromptInputProps) {
   const showPreview = isStreaming || streamedText.length > 0 || streamError;
 
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className="overflow-hidden rounded-lg border bg-card p-4">
       <Label htmlFor="ai-prompt" className="mb-2 flex items-center gap-1.5">
         <Sparkles className="size-4" />
         Generate with AI
@@ -155,6 +157,7 @@ export function AiPromptInput({ onGenerated }: AiPromptInputProps) {
       <div className="flex gap-2">
         <Input
           id="ai-prompt"
+          className="min-w-0"
           placeholder='e.g. "100g paneer and spinach"'
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -165,7 +168,7 @@ export function AiPromptInput({ onGenerated }: AiPromptInputProps) {
           maxLength={500}
         />
         {isStreaming ? (
-          <Button onClick={handleStop} variant="destructive">
+          <Button onClick={handleStop} variant="destructive" className="shrink-0">
             <Square className="size-4" />
             Stop
           </Button>
@@ -173,6 +176,7 @@ export function AiPromptInput({ onGenerated }: AiPromptInputProps) {
           <Button
             onClick={handleGenerate}
             disabled={prompt.trim().length < 3}
+            className="shrink-0"
           >
             <Sparkles className="size-4" />
             Generate

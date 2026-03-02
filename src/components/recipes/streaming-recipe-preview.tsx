@@ -100,7 +100,7 @@ export function StreamingRecipePreview({
 
       {/* Expandable detail panel */}
       {isExpanded && (
-        <div className="max-h-72 overflow-y-auto border-t px-4 py-3">
+        <div className="max-h-72 overflow-auto border-t px-4 py-3">
           {recipe.name ||
           recipe.ingredients.length > 0 ||
           recipe.instructions.length > 0 ? (

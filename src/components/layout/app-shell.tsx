@@ -75,7 +75,7 @@ export function AppShell({ children }: AppShellProps) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 md:pl-60">
+      <main className="flex-1 min-w-0 md:pl-60">
         <div className="mx-auto max-w-4xl px-4 py-6 pb-28 md:px-8 md:py-8 md:pb-8">
           {children}
         </div>

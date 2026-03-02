@@ -125,12 +125,12 @@ export default function NewRecipePage() {
         <AiPromptInput onGenerated={handleGenerated} />
 
         <div ref={formRef}>
-        <RecipeForm
-          key={generatedDefaults?.name ?? "new"}
-          defaultValues={generatedDefaults ?? undefined}
-          onSubmit={handleSubmit}
-          isLoading={isLoading}
-        />
+          <RecipeForm
+            key={generatedDefaults?.name ?? "new"}
+            defaultValues={generatedDefaults ?? undefined}
+            onSubmit={handleSubmit}
+            isLoading={isLoading}
+          />
         </div>
       </div>
     </>
