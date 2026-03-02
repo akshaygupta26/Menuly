@@ -1,4 +1,8 @@
-import type { NutritionInfo } from "@/types/database";
+import type { NutritionInfo, IngredientNutritionDetail } from "@/types/database";
+import { convertToGrams } from "@/lib/unit-conversion";
+
+// Re-export for backward compatibility
+export { convertToGrams } from "@/lib/unit-conversion";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -18,75 +22,10 @@ interface USDASearchResponse {
   foods: USDAFood[];
 }
 
-interface IngredientInput {
+export interface IngredientInput {
   name: string;
   quantity: number | null;
   unit: string | null;
-}
-
-// ---------------------------------------------------------------------------
-// Unit → grams conversion
-// ---------------------------------------------------------------------------
-
-const UNIT_TO_GRAMS: Record<string, number> = {
-  // Volume (approximate for water-density ingredients)
-  cup: 240,
-  cups: 240,
-  tbsp: 15,
-  tablespoon: 15,
-  tablespoons: 15,
-  tsp: 5,
-  teaspoon: 5,
-  teaspoons: 5,
-  "fl oz": 30,
-  "fluid ounce": 30,
-  "fluid ounces": 30,
-  ml: 1,
-  milliliter: 1,
-  milliliters: 1,
-  l: 1000,
-  liter: 1000,
-  liters: 1000,
-  // Weight
-  g: 1,
-  gram: 1,
-  grams: 1,
-  kg: 1000,
-  kilogram: 1000,
-  kilograms: 1000,
-  oz: 28.35,
-  ounce: 28.35,
-  ounces: 28.35,
-  lb: 453.6,
-  lbs: 453.6,
-  pound: 453.6,
-  pounds: 453.6,
-};
-
-/**
- * Convert a quantity + unit to grams. Falls back to treating quantity as
- * "count" with an assumed 100g per item when the unit is unknown.
- */
-export function convertToGrams(
-  quantity: number | null,
-  unit: string | null
-): number {
-  const qty = quantity ?? 1;
-
-  if (!unit) {
-    // No unit = assume "1 item ≈ 100g" as a rough default
-    return qty * 100;
-  }
-
-  const normalised = unit.toLowerCase().trim();
-  const factor = UNIT_TO_GRAMS[normalised];
-
-  if (factor !== undefined) {
-    return qty * factor;
-  }
-
-  // Unknown unit — treat as count × 100g
-  return qty * 100;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,9 +38,17 @@ const NUTRIENT_PROTEIN = 203;
 const NUTRIENT_CARBS = 205;
 const NUTRIENT_FAT = 204;
 
+// Module-level cache for USDA lookups (resets on redeploy)
+const usdaCache = new Map<string, NutritionInfo>();
+
+function normalizeKey(query: string): string {
+  return query.toLowerCase().trim();
+}
+
 /**
  * Search the USDA FoodData Central database for a food item.
  * Returns per-100g nutrient values, or null if not found.
+ * Results are cached in-memory to avoid redundant API calls.
  */
 export async function searchUSDAFood(
   query: string
@@ -110,6 +57,12 @@ export async function searchUSDAFood(
   if (!apiKey) {
     console.warn("USDA_API_KEY not set — skipping USDA lookup");
     return null;
+  }
+
+  const cacheKey = normalizeKey(query);
+  const cached = usdaCache.get(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   const response = await fetch(
@@ -149,12 +102,16 @@ export async function searchUSDAFood(
     return null;
   };
 
-  return {
+  const result: NutritionInfo = {
     calories: getNutrient(NUTRIENT_ENERGY),
     protein_g: getNutrient(NUTRIENT_PROTEIN),
     carbs_g: getNutrient(NUTRIENT_CARBS),
     fat_g: getNutrient(NUTRIENT_FAT),
   };
+
+  usdaCache.set(cacheKey, result);
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -224,5 +181,87 @@ export async function calculateNutritionForIngredients(
     protein_g: Math.round(totals.protein_g / divisor),
     carbs_g: Math.round(totals.carbs_g / divisor),
     fat_g: Math.round(totals.fat_g / divisor),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Batch nutrition calculation with per-ingredient breakdown
+// ---------------------------------------------------------------------------
+
+interface NutritionWithBreakdown {
+  totals: NutritionInfo;
+  ingredients: IngredientNutritionDetail[];
+}
+
+/**
+ * Same as calculateNutritionForIngredients but also returns per-ingredient
+ * per-100g values so the client can recalculate when quantities change.
+ */
+export async function calculateNutritionWithBreakdown(
+  ingredients: IngredientInput[],
+  servings: number
+): Promise<NutritionWithBreakdown> {
+  const totals = { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
+  const details: IngredientNutritionDetail[] = [];
+  let hasAnyData = false;
+
+  const BATCH_SIZE = 5;
+
+  for (let i = 0; i < ingredients.length; i += BATCH_SIZE) {
+    const batch = ingredients.slice(i, i + BATCH_SIZE);
+
+    const results = await Promise.all(
+      batch.map(async (ing) => {
+        const per100g = await searchUSDAFood(ing.name);
+        if (!per100g) return null;
+
+        const grams = convertToGrams(ing.quantity, ing.unit);
+        const scale = grams / 100;
+
+        const scaled: NutritionInfo = {
+          calories: Math.round((per100g.calories ?? 0) * scale),
+          protein_g: Math.round((per100g.protein_g ?? 0) * scale),
+          carbs_g: Math.round((per100g.carbs_g ?? 0) * scale),
+          fat_g: Math.round((per100g.fat_g ?? 0) * scale),
+        };
+
+        return { name: ing.name, per100g, scaled };
+      })
+    );
+
+    for (const result of results) {
+      if (result) {
+        hasAnyData = true;
+        details.push(result);
+        totals.calories += result.scaled.calories ?? 0;
+        totals.protein_g += result.scaled.protein_g ?? 0;
+        totals.carbs_g += result.scaled.carbs_g ?? 0;
+        totals.fat_g += result.scaled.fat_g ?? 0;
+      }
+    }
+  }
+
+  if (!hasAnyData) {
+    return {
+      totals: {
+        calories: null,
+        protein_g: null,
+        carbs_g: null,
+        fat_g: null,
+      },
+      ingredients: [],
+    };
+  }
+
+  const divisor = Math.max(servings, 1);
+
+  return {
+    totals: {
+      calories: Math.round(totals.calories / divisor),
+      protein_g: Math.round(totals.protein_g / divisor),
+      carbs_g: Math.round(totals.carbs_g / divisor),
+      fat_g: Math.round(totals.fat_g / divisor),
+    },
+    ingredients: details,
   };
 }

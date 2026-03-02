@@ -28,14 +28,41 @@ Weekly meal planning & grocery list app. Users build a recipe library, auto-gene
 - Use `date-fns` for date manipulation (not native Date methods)
 - Types live in `src/types/database.ts` — keep this as the single source of truth
 
+## Nutrition Feature
+- **Schema:** `recipes` table has nullable columns: `calories`, `protein_g`, `carbs_g`, `fat_g` (all `NUMERIC`), `nutrition_source` (`TEXT CHECK IN ('json_ld', 'usda', 'manual')`)
+- **Migration:** `supabase/migrations/002_nutrition_columns.sql`
+- **Three data sources (priority order):**
+  1. **JSON-LD** — extracted automatically from recipe URLs during import (`scrapeRecipe()` parses `schema.org/NutritionInformation`)
+  2. **USDA FoodData Central API** — fallback calculation via `/api/nutrition/calculate` endpoint. Looks up each ingredient, scales by quantity/unit, sums, divides by servings
+  3. **Manual entry** — users can always type values directly in the recipe form
+- **USDA client** (`src/lib/nutrition.ts`): uses `POST /fdc/v1/foods/search` with `SR Legacy` dataset. Nutrient IDs: 208/957/958 (energy), 203 (protein), 205 (carbs), 204 (fat). Batched to 5 concurrent requests for rate limiting
+- **Unit conversion:** `convertToGrams()` maps cooking units (cup=240g, tbsp=15g, tsp=5g, oz=28.35g, lb=453.6g, etc.) to grams for USDA scaling
+- **Env var:** `USDA_API_KEY` (server-only, no `NEXT_PUBLIC_` prefix)
+
+## Authentication
+- **Google OAuth** via Supabase `signInWithOAuth({ provider: "google" })`
+- **Email/password** with login and signup modes
+- **Magic link** (passwordless) via `signInWithOtp`
+- **Password reset** via `resetPasswordForEmail`
+- **Callback route:** `src/app/(auth)/callback/route.ts` exchanges auth code for session
+- **Supabase Dashboard config required:** Site URL and Redirect URLs must include the production domain (e.g. `https://menuly-nine.vercel.app/callback`)
+
+## Deployment
+- **GitHub:** https://github.com/akshaygupta26/Menuly.git
+- **Vercel:** https://menuly-nine.vercel.app — deploy with `vercel --prod --yes`
+- **Env vars in Vercel:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `USDA_API_KEY`
+
 ## Important Files / Paths
 - `src/actions/` — server actions (recipes.ts, meal-plans.ts, grocery.ts, settings.ts, auth.ts)
 - `src/lib/rotation-algorithm.ts` — smart meal rotation scoring (recency + cuisine/protein diversity)
-- `src/lib/recipe-scraper.ts` — JSON-LD extraction from recipe URLs
+- `src/lib/recipe-scraper.ts` — JSON-LD + nutrition extraction from recipe URLs
+- `src/lib/nutrition.ts` — USDA API client and nutrition calculator
 - `src/lib/ingredient-parser.ts` — parses "2 lbs chicken breast" into structured data
 - `src/lib/grocery-consolidator.ts` — merges ingredients across recipes, converts units
 - `src/lib/supabase/` — client.ts, server.ts, middleware.ts
+- `src/app/api/nutrition/calculate/route.ts` — POST endpoint for USDA-based nutrition calculation
 - `supabase/migrations/001_initial_schema.sql` — full DB schema (8 tables, RLS, triggers)
+- `supabase/migrations/002_nutrition_columns.sql` — nutrition columns on recipes table
 - `src/app/globals.css` — theme variables (terracotta primary, sage secondary, oklch color space)
 
 ## Do Nots

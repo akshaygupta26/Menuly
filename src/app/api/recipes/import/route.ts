@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { scrapeRecipe } from "@/lib/recipe-scraper";
 import { parseIngredient } from "@/lib/ingredient-parser";
+import { calculateNutritionForIngredients } from "@/lib/nutrition";
 
 export async function POST(request: NextRequest) {
   try {
@@ -90,6 +91,34 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    // Determine nutrition data and source
+    let nutrition = scraped.nutrition ?? null;
+    let nutrition_source: "json_ld" | "usda" | null = nutrition
+      ? "json_ld"
+      : null;
+
+    // USDA fallback when JSON-LD has no nutrition data
+    if (!nutrition && parsedIngredients.length > 0) {
+      try {
+        const servings = scraped.servings ?? 1;
+        const usdaNutrition = await calculateNutritionForIngredients(
+          parsedIngredients.map((ing) => ({
+            name: ing.name,
+            quantity: ing.quantity,
+            unit: ing.unit,
+          })),
+          servings
+        );
+        // Only use USDA result if we got actual data
+        if (usdaNutrition.calories != null) {
+          nutrition = usdaNutrition;
+          nutrition_source = "usda";
+        }
+      } catch {
+        // USDA failed — continue without nutrition data
+      }
+    }
+
     // Return structured recipe data
     return NextResponse.json({
       name: scraped.name,
@@ -100,7 +129,8 @@ export async function POST(request: NextRequest) {
       servings: scraped.servings,
       image: scraped.image,
       url: scraped.url ?? url,
-      nutrition: scraped.nutrition ?? null,
+      nutrition,
+      nutrition_source,
     });
   } catch {
     return NextResponse.json(

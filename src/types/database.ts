@@ -7,6 +7,12 @@ export interface NutritionInfo {
   fat_g: number | null;
 }
 
+export interface IngredientNutritionDetail {
+  name: string;
+  per100g: NutritionInfo;
+  scaled: NutritionInfo;
+}
+
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 export type MealPlanStatus = "draft" | "finalized";
 export type IngredientCategory =

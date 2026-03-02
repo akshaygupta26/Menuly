@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { calculateNutritionForIngredients } from "@/lib/nutrition";
+import { calculateNutritionWithBreakdown } from "@/lib/nutrition";
 
 interface CalculateRequestBody {
   ingredients: { name: string; quantity: number | null; unit: string | null }[];
@@ -23,12 +23,12 @@ export async function POST(request: NextRequest) {
         ? body.servings
         : 1;
 
-    const nutrition = await calculateNutritionForIngredients(
+    const result = await calculateNutritionWithBreakdown(
       body.ingredients,
       servings
     );
 
-    return NextResponse.json(nutrition);
+    return NextResponse.json(result);
   } catch {
     return NextResponse.json(
       { error: "Failed to calculate nutrition." },

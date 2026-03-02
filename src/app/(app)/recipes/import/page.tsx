@@ -27,7 +27,9 @@ export default function ImportRecipePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [importedDefaults, setImportedDefaults] =
     useState<Partial<RecipeFormValues> | null>(null);
-  const [hasJsonLdNutrition, setHasJsonLdNutrition] = useState(false);
+  const [importedNutritionSource, setImportedNutritionSource] = useState<
+    "json_ld" | "usda" | null
+  >(null);
 
   function handleImport(data: ImportedRecipeData) {
     // Convert imported data into RecipeForm default values
@@ -71,9 +73,10 @@ export default function ImportRecipePage() {
       protein_g: data.nutrition?.protein_g ?? "",
       carbs_g: data.nutrition?.carbs_g ?? "",
       fat_g: data.nutrition?.fat_g ?? "",
+      nutrition_source: data.nutrition_source ?? "",
     });
 
-    setHasJsonLdNutrition(data.nutrition != null);
+    setImportedNutritionSource(data.nutrition_source);
     toast.success("Recipe imported! Review and save below.");
   }
 
@@ -135,9 +138,7 @@ export default function ImportRecipePage() {
           carbs_g: values.carbs_g ? Number(values.carbs_g) : null,
           fat_g: values.fat_g ? Number(values.fat_g) : null,
           nutrition_source: hasNutrition
-            ? hasJsonLdNutrition
-              ? "json_ld"
-              : "manual"
+            ? (values.nutrition_source || importedNutritionSource || "manual")
             : null,
         },
         ingredients,

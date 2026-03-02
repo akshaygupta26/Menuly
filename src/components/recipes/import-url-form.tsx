@@ -32,6 +32,7 @@ export interface ImportedRecipeData {
     carbs_g: number | null;
     fat_g: number | null;
   } | null;
+  nutrition_source: "json_ld" | "usda" | null;
 }
 
 export function ImportUrlForm({ onImport }: ImportUrlFormProps) {

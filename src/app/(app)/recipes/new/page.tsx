@@ -77,7 +77,9 @@ export default function NewRecipePage() {
           protein_g: values.protein_g ? Number(values.protein_g) : null,
           carbs_g: values.carbs_g ? Number(values.carbs_g) : null,
           fat_g: values.fat_g ? Number(values.fat_g) : null,
-          nutrition_source: hasNutrition ? "manual" : null,
+          nutrition_source: hasNutrition
+            ? (values.nutrition_source || "manual")
+            : null,
         },
         ingredients,
       });

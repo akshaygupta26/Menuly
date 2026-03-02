@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Plus, Calculator, Loader2 } from "lucide-react";
 
-import type { MealType, IngredientCategory } from "@/types/database";
+import type {
+  MealType,
+  IngredientCategory,
+  NutritionInfo,
+} from "@/types/database";
+import { parseIngredient } from "@/lib/ingredient-parser";
+import { convertToGrams } from "@/lib/unit-conversion";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -53,6 +59,7 @@ export interface RecipeFormValues {
   protein_g: number | string;
   carbs_g: number | string;
   fat_g: number | string;
+  nutrition_source: "json_ld" | "usda" | "manual" | "";
 }
 
 interface RecipeFormProps {
@@ -123,6 +130,14 @@ export function RecipeForm({
 }: RecipeFormProps) {
   const [isCalculating, setIsCalculating] = useState(false);
 
+  // Per-ingredient nutrition cache (keyed by lowercase ingredient name)
+  const [nutritionCache, setNutritionCache] = useState<
+    Map<string, NutritionInfo>
+  >(() => new Map());
+  const [hasCalculated, setHasCalculated] = useState(false);
+  const [needsRecalculate, setNeedsRecalculate] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const { register, handleSubmit, control, watch, setValue } =
     useForm<RecipeFormValues>({
       defaultValues: {
@@ -144,6 +159,7 @@ export function RecipeForm({
         protein_g: "",
         carbs_g: "",
         fat_g: "",
+        nutrition_source: "",
         ...defaultValues,
       },
     });
@@ -154,6 +170,8 @@ export function RecipeForm({
   });
 
   const mealTypeValues = watch("meal_type");
+  const watchedIngredients = watch("ingredients");
+  const watchedServings = watch("servings");
 
   function toggleMealType(type: MealType) {
     const current = mealTypeValues ?? [];
@@ -161,6 +179,136 @@ export function RecipeForm({
       ? current.filter((t) => t !== type)
       : [...current, type];
     setValue("meal_type", next);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Client-side recalculation from cache
+  // ---------------------------------------------------------------------------
+
+  const recalculateFromCache = useCallback(
+    (
+      ingredients: IngredientFormValues[],
+      servings: number,
+      cache: Map<string, NutritionInfo>
+    ) => {
+      const totals = { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
+      let hasAny = false;
+      let hasMissing = false;
+
+      for (const ing of ingredients) {
+        const text = ing.raw_text.trim();
+        if (!text) continue;
+
+        const parsed = parseIngredient(text);
+        const key = parsed.name.toLowerCase().trim();
+        const per100g = cache.get(key);
+
+        if (!per100g) {
+          hasMissing = true;
+          continue;
+        }
+
+        hasAny = true;
+        const grams = convertToGrams(parsed.quantity, parsed.unit);
+        const scale = grams / 100;
+
+        totals.calories += (per100g.calories ?? 0) * scale;
+        totals.protein_g += (per100g.protein_g ?? 0) * scale;
+        totals.carbs_g += (per100g.carbs_g ?? 0) * scale;
+        totals.fat_g += (per100g.fat_g ?? 0) * scale;
+      }
+
+      setNeedsRecalculate(hasMissing);
+
+      if (hasAny) {
+        const divisor = Math.max(servings, 1);
+        setValue("calories", Math.round(totals.calories / divisor));
+        setValue("protein_g", Math.round(totals.protein_g / divisor));
+        setValue("carbs_g", Math.round(totals.carbs_g / divisor));
+        setValue("fat_g", Math.round(totals.fat_g / divisor));
+      }
+    },
+    [setValue]
+  );
+
+  // Auto-recalculate when ingredients or servings change (after first Calculate)
+  useEffect(() => {
+    if (!hasCalculated || nutritionCache.size === 0) return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    debounceRef.current = setTimeout(() => {
+      const servings = Number(watchedServings) || 1;
+      recalculateFromCache(watchedIngredients, servings, nutritionCache);
+    }, 500);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [
+    watchedIngredients,
+    watchedServings,
+    hasCalculated,
+    nutritionCache,
+    recalculateFromCache,
+  ]);
+
+  // ---------------------------------------------------------------------------
+  // Calculate button handler
+  // ---------------------------------------------------------------------------
+
+  async function handleCalculate() {
+    const currentIngredients = watch("ingredients");
+    const filtered = currentIngredients.filter(
+      (ing) => ing.name.trim() || ing.raw_text.trim()
+    );
+    if (filtered.length === 0) return;
+
+    setIsCalculating(true);
+    try {
+      const servings = Number(watch("servings")) || 1;
+
+      // Parse each ingredient to get structured data for the API
+      const parsedForApi = filtered.map((ing) => {
+        const parsed = parseIngredient(ing.raw_text || ing.name);
+        return {
+          name: parsed.name,
+          quantity: parsed.quantity,
+          unit: parsed.unit,
+        };
+      });
+
+      const response = await fetch("/api/nutrition/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ingredients: parsedForApi, servings }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Update form with totals
+        if (data.totals.calories != null)
+          setValue("calories", data.totals.calories);
+        if (data.totals.protein_g != null)
+          setValue("protein_g", data.totals.protein_g);
+        if (data.totals.carbs_g != null)
+          setValue("carbs_g", data.totals.carbs_g);
+        if (data.totals.fat_g != null) setValue("fat_g", data.totals.fat_g);
+
+        // Populate per-ingredient cache from breakdown
+        const newCache = new Map(nutritionCache);
+        for (const detail of data.ingredients) {
+          newCache.set(detail.name.toLowerCase().trim(), detail.per100g);
+        }
+        setNutritionCache(newCache);
+        setHasCalculated(true);
+        setNeedsRecalculate(false);
+        setValue("nutrition_source", "usda");
+      }
+    } finally {
+      setIsCalculating(false);
+    }
   }
 
   return (
@@ -275,46 +423,20 @@ export function RecipeForm({
       {/* Nutrition (per serving) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label>Nutrition (per serving)</Label>
+          <div className="space-y-1">
+            <Label>Nutrition (per serving)</Label>
+            {needsRecalculate && hasCalculated && (
+              <p className="text-xs text-amber-600">
+                New ingredients detected — click Calculate to update
+              </p>
+            )}
+          </div>
           <Button
             type="button"
             variant="outline"
             size="sm"
             disabled={isCalculating || isLoading}
-            onClick={async () => {
-              const currentIngredients = watch("ingredients");
-              const filtered = currentIngredients.filter(
-                (ing) => ing.name.trim() || ing.raw_text.trim()
-              );
-              if (filtered.length === 0) return;
-
-              setIsCalculating(true);
-              try {
-                const servings = Number(watch("servings")) || 1;
-                const response = await fetch("/api/nutrition/calculate", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    ingredients: filtered.map((ing) => ({
-                      name: ing.name || ing.raw_text,
-                      quantity: ing.quantity,
-                      unit: ing.unit,
-                    })),
-                    servings,
-                  }),
-                });
-
-                if (response.ok) {
-                  const data = await response.json();
-                  if (data.calories != null) setValue("calories", data.calories);
-                  if (data.protein_g != null) setValue("protein_g", data.protein_g);
-                  if (data.carbs_g != null) setValue("carbs_g", data.carbs_g);
-                  if (data.fat_g != null) setValue("fat_g", data.fat_g);
-                }
-              } finally {
-                setIsCalculating(false);
-              }
-            }}
+            onClick={handleCalculate}
           >
             {isCalculating ? (
               <>
