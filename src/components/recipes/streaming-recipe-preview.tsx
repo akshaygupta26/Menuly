@@ -149,14 +149,15 @@ export function StreamingRecipePreview({
             )}
           </div>
         ) : (
-          /* Fallback: raw text when no fields parsed yet */
-          <div className="space-y-2">
-            <pre className="break-all whitespace-pre-wrap font-mono text-xs text-muted-foreground">
-              {text}
-            </pre>
-            {isStreaming && (
-              <span className="inline-block h-4 w-1.5 animate-pulse bg-primary/60" />
-            )}
+          /* Skeleton loading state while waiting for first parseable field */
+          <div className="space-y-3 animate-pulse">
+            <div className="h-5 w-48 rounded bg-muted" />
+            <div className="h-3 w-32 rounded bg-muted" />
+            <div className="space-y-1.5">
+              <div className="h-3 w-full rounded bg-muted" />
+              <div className="h-3 w-5/6 rounded bg-muted" />
+              <div className="h-3 w-4/6 rounded bg-muted" />
+            </div>
           </div>
         )}
         <div ref={bottomRef} />
