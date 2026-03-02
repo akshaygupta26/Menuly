@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { addDays, format, parseISO } from "date-fns";
-import { Plus, X, Sparkles, Lock, Unlock, ShoppingCart, CalendarDays, Trash2 } from "lucide-react";
+import { Plus, X, Sparkles, Lock, Unlock, ShoppingCart, CalendarDays, Trash2, Flame } from "lucide-react";
 
 import type { MealPlan, MealPlanItemWithRecipe, MealType } from "@/types/database";
 import { cn } from "@/lib/utils";
@@ -74,8 +74,75 @@ function buildDayDates(weekStart: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Nutrition helpers
+// ---------------------------------------------------------------------------
+
+interface DayNutritionTotals {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+function hasNutrition(item: MealPlanItemWithRecipe): boolean {
+  return item.recipe?.calories != null;
+}
+
+function computeDayTotals(
+  items: MealPlanItemWithRecipe[],
+  dayOfWeek: number
+): DayNutritionTotals | null {
+  const dayItems = items.filter(
+    (i) => i.day_of_week === dayOfWeek && hasNutrition(i)
+  );
+  if (dayItems.length === 0) return null;
+
+  return dayItems.reduce<DayNutritionTotals>(
+    (acc, item) => ({
+      calories: acc.calories + (item.recipe!.calories ?? 0),
+      protein: acc.protein + (item.recipe!.protein_g ?? 0),
+      carbs: acc.carbs + (item.recipe!.carbs_g ?? 0),
+      fat: acc.fat + (item.recipe!.fat_g ?? 0),
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+function DayNutritionSummary({
+  totals,
+  compact = false,
+}: {
+  totals: DayNutritionTotals;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center text-[10px] font-medium",
+        compact ? "gap-x-2 gap-y-0.5" : "gap-x-3 gap-y-1"
+      )}
+    >
+      <span className="flex items-center gap-0.5 text-orange-600 dark:text-orange-400">
+        <Flame className="size-3" />
+        {Math.round(totals.calories)}
+      </span>
+      <span className="text-blue-600 dark:text-blue-400">
+        P {Math.round(totals.protein)}g
+      </span>
+      <span className="text-amber-600 dark:text-amber-400">
+        C {Math.round(totals.carbs)}g
+      </span>
+      <span className="text-emerald-600 dark:text-emerald-400">
+        F {Math.round(totals.fat)}g
+      </span>
+      <span className="text-muted-foreground/60 italic">/ serving</span>
+    </div>
+  );
+}
 
 function MealSlotCell({
   item,
@@ -94,25 +161,34 @@ function MealSlotCell({
 }) {
   if (item) {
     const displayName = item.recipe?.name ?? item.custom_name ?? "Untitled";
+    const showNutrition = hasNutrition(item);
 
     return (
       <div
         className={cn(
-          "group relative flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+          "group relative rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
           SLOT_COLORS[mealSlot]
         )}
         data-droppable={`${dayOfWeek}-${mealSlot}`}
       >
-        <span className="min-w-0 truncate">{displayName}</span>
-        {!isFinalized && (
-          <button
-            type="button"
-            onClick={() => onRemove(item.id)}
-            className="ml-auto shrink-0 rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-black/10 group-hover:opacity-100 dark:hover:bg-white/10"
-            aria-label={`Remove ${displayName}`}
-          >
-            <X className="size-3" />
-          </button>
+        <div className="flex items-center gap-1.5">
+          <span className="min-w-0 truncate">{displayName}</span>
+          {!isFinalized && (
+            <button
+              type="button"
+              onClick={() => onRemove(item.id)}
+              className="ml-auto shrink-0 rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-black/10 group-hover:opacity-100 dark:hover:bg-white/10"
+              aria-label={`Remove ${displayName}`}
+            >
+              <X className="size-3" />
+            </button>
+          )}
+        </div>
+        {showNutrition && (
+          <div className="mt-0.5 text-[10px] font-normal opacity-60">
+            {Math.round(item.recipe!.calories!)} kcal · P {Math.round(item.recipe!.protein_g ?? 0)}g · C {Math.round(item.recipe!.carbs_g ?? 0)}g · F {Math.round(item.recipe!.fat_g ?? 0)}g
+            <span className="ml-1 italic">/ serving</span>
+          </div>
         )}
       </div>
     );
@@ -165,6 +241,17 @@ export function WeekGrid({
       }
     }
     return map;
+  }, [mealPlan]);
+
+  // Precompute day nutrition totals
+  const dayTotals = useMemo(() => {
+    const totals = new Map<number, DayNutritionTotals | null>();
+    if (mealPlan?.items) {
+      for (const dow of ORDERED_DAYS) {
+        totals.set(dow, computeDayTotals(mealPlan.items, dow));
+      }
+    }
+    return totals;
   }, [mealPlan]);
 
   return (
@@ -318,6 +405,23 @@ export function WeekGrid({
               );
             })
           )}
+
+          {/* Day nutrition totals row */}
+          {dayDates.map(({ dayOfWeek }) => {
+            const totals = dayTotals.get(dayOfWeek);
+            return (
+              <div
+                key={`totals-${dayOfWeek}`}
+                className="flex items-center justify-center bg-muted/30 p-1.5"
+              >
+                {totals ? (
+                  <DayNutritionSummary totals={totals} compact />
+                ) : (
+                  <span className="text-[10px] text-muted-foreground/40">--</span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -366,6 +470,17 @@ export function WeekGrid({
                 );
               })}
             </div>
+
+            {/* Day nutrition totals footer */}
+            {(() => {
+              const totals = dayTotals.get(dayOfWeek);
+              if (!totals) return null;
+              return (
+                <div className="border-t bg-muted/30 px-3 py-2">
+                  <DayNutritionSummary totals={totals} />
+                </div>
+              );
+            })()}
           </div>
         ))}
       </div>

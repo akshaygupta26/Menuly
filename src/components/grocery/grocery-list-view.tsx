@@ -1,27 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
 import {
-  toggleGroceryItem,
   addManualItem,
   removeGroceryItem,
-  clearCheckedItems,
 } from "@/actions/grocery";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { AddItemInput } from "@/components/grocery/add-item-input";
 import type { GroceryList, GroceryItem, IngredientCategory } from "@/types/database";
 
@@ -72,10 +61,8 @@ interface GroceryListViewProps {
 }
 
 type OptimisticAction =
-  | { type: "toggle"; itemId: string }
   | { type: "add"; item: GroceryItem }
   | { type: "remove"; itemId: string }
-  | { type: "clear_checked" }
   | { type: "sync"; items: GroceryItem[] };
 
 // ---------------------------------------------------------------------------
@@ -105,16 +92,10 @@ function formatQuantity(item: GroceryItem): string {
 
 function itemsReducer(items: GroceryItem[], action: OptimisticAction): GroceryItem[] {
   switch (action.type) {
-    case "toggle":
-      return items.map((item) =>
-        item.id === action.itemId ? { ...item, is_checked: !item.is_checked } : item
-      );
     case "add":
       return [...items, action.item];
     case "remove":
       return items.filter((item) => item.id !== action.itemId);
-    case "clear_checked":
-      return items.filter((item) => !item.is_checked);
     case "sync":
       return action.items;
     default:
@@ -138,7 +119,8 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
     }
   });
   const [isPending, startTransition] = useTransition();
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [dismissingIds, setDismissingIds] = useState<Set<string>>(new Set());
+  const dismissTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // ---- Realtime subscription ----
   useEffect(() => {
@@ -181,8 +163,14 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
   // ---- Derived state ----
   const grouped = useMemo(() => groupByCategory(items), [items]);
   const totalCount = items.length;
-  const checkedCount = items.filter((i) => i.is_checked).length;
-  const progressPercent = totalCount === 0 ? 0 : Math.round((checkedCount / totalCount) * 100);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    const timers = dismissTimers.current;
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+    };
+  }, []);
 
   // ---- Handlers ----
   const toggleCategory = useCallback((category: IngredientCategory) => {
@@ -203,15 +191,30 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
     });
   }, [initialList.id]);
 
-  const handleToggle = useCallback(
+  const handleCheck = useCallback(
     (itemId: string) => {
-      startTransition(async () => {
-        dispatchOptimistic({ type: "toggle", itemId });
-        const result = await toggleGroceryItem(itemId);
-        if (result.error) {
-          toast.error("Failed to update item");
-        }
-      });
+      // Start dismissal animation
+      setDismissingIds((prev) => new Set(prev).add(itemId));
+
+      // After animation, remove the item
+      const timer = setTimeout(() => {
+        setDismissingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(itemId);
+          return next;
+        });
+        dismissTimers.current.delete(itemId);
+
+        startTransition(async () => {
+          dispatchOptimistic({ type: "remove", itemId });
+          const result = await removeGroceryItem(itemId);
+          if (result.error) {
+            toast.error("Failed to remove item");
+          }
+        });
+      }, 500);
+
+      dismissTimers.current.set(itemId, timer);
     },
     [dispatchOptimistic]
   );
@@ -241,30 +244,12 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
     [dispatchOptimistic]
   );
 
-  const handleClearChecked = useCallback(() => {
-    if (checkedCount === 0) return;
-
-    startTransition(async () => {
-      dispatchOptimistic({ type: "clear_checked" });
-      const result = await clearCheckedItems(initialList.id);
-      if (result.error) {
-        toast.error("Failed to clear checked items");
-      }
-    });
-  }, [initialList.id, checkedCount, dispatchOptimistic]);
-
   // ---- Render ----
   return (
     <div className="space-y-6">
-      {/* Progress bar */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            {checkedCount} of {totalCount} items checked
-          </span>
-          <span>{progressPercent}%</span>
-        </div>
-        <Progress value={progressPercent} />
+      {/* Item count */}
+      <div className="text-sm text-muted-foreground">
+        {totalCount} item{totalCount !== 1 ? "s" : ""} remaining
       </div>
 
       {/* Category groups */}
@@ -272,7 +257,6 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
         {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((category) => {
           const categoryItems = grouped.get(category)!;
           const isCollapsed = collapsedCategories.has(category);
-          const categoryChecked = categoryItems.filter((i) => i.is_checked).length;
 
           return (
             <div key={category} className="rounded-lg border">
@@ -290,7 +274,7 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
                 <span className="mr-1">{CATEGORY_EMOJI[category]}</span>
                 <span className="font-medium">{CATEGORY_LABELS[category]}</span>
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {categoryChecked}/{categoryItems.length}
+                  {categoryItems.length}
                 </span>
               </button>
 
@@ -298,47 +282,56 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
               {!isCollapsed && (
                 <div className="border-t px-4 py-2">
                   <ul className="divide-y">
-                    {categoryItems.map((item) => (
-                      <li
-                        key={item.id}
-                        className="flex items-center gap-3 py-2.5 group"
-                      >
-                        <Checkbox
-                          checked={item.is_checked}
-                          onCheckedChange={() => handleToggle(item.id)}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <span
-                            className={
-                              item.is_checked
-                                ? "line-through text-muted-foreground"
-                                : "text-foreground"
-                            }
-                          >
-                            {item.name}
-                          </span>
-                          {formatQuantity(item) && (
-                            <span className="ml-2 text-sm text-muted-foreground">
-                              {formatQuantity(item)}
-                            </span>
-                          )}
-                          {item.added_manually && (
-                            <span className="ml-2 text-xs text-muted-foreground italic">
-                              manual
-                            </span>
-                          )}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity size-8 p-0"
-                          onClick={() => handleRemove(item.id)}
+                    {categoryItems.map((item) => {
+                      const isDismissing = dismissingIds.has(item.id);
+                      return (
+                        <li
+                          key={item.id}
+                          className="flex items-center gap-3 py-2.5 group transition-all duration-500"
+                          style={
+                            isDismissing
+                              ? { opacity: 0, transform: "translateX(20px)" }
+                              : { opacity: 1, transform: "translateX(0)" }
+                          }
                         >
-                          <Trash2 className="size-3.5 text-muted-foreground" />
-                          <span className="sr-only">Remove</span>
-                        </Button>
-                      </li>
-                    ))}
+                          <Checkbox
+                            checked={isDismissing}
+                            onCheckedChange={() => handleCheck(item.id)}
+                            disabled={isDismissing}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <span
+                              className={
+                                isDismissing
+                                  ? "line-through text-muted-foreground transition-all duration-300"
+                                  : "text-foreground"
+                              }
+                            >
+                              {item.name}
+                            </span>
+                            {formatQuantity(item) && (
+                              <span className="ml-2 text-sm text-muted-foreground">
+                                {formatQuantity(item)}
+                              </span>
+                            )}
+                            {item.added_manually && (
+                              <span className="ml-2 text-xs text-muted-foreground italic">
+                                manual
+                              </span>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity size-8 p-0"
+                            onClick={() => handleRemove(item.id)}
+                          >
+                            <Trash2 className="size-3.5 text-muted-foreground" />
+                            <span className="sr-only">Remove</span>
+                          </Button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
@@ -353,50 +346,6 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
         <AddItemInput onAdd={handleAdd} />
       </div>
 
-      {/* Clear checked */}
-      {checkedCount > 0 && (
-        <div className="flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowClearConfirm(true)}
-            disabled={isPending}
-          >
-            <Trash2 className="size-4" />
-            Clear {checkedCount} checked item{checkedCount !== 1 ? "s" : ""}
-          </Button>
-        </div>
-      )}
-
-      <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Clear checked items?</DialogTitle>
-            <DialogDescription>
-              This will remove {checkedCount} checked item
-              {checkedCount !== 1 ? "s" : ""} from your grocery list. This
-              cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowClearConfirm(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setShowClearConfirm(false);
-                handleClearChecked();
-              }}
-            >
-              Clear Items
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

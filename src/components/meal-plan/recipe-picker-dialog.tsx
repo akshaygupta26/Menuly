@@ -58,7 +58,7 @@ export function RecipePickerDialog({
   // Fetch recipes when dialog opens
   const fetchRecipes = useCallback(() => {
     startTransition(async () => {
-      const { data, error } = await getRecipesForPicker(mealSlot);
+      const { data, error } = await getRecipesForPicker(undefined, mealSlot);
       if (!error && data) {
         setRecipes(data);
       }
