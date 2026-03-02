@@ -10,6 +10,7 @@ import { createRecipe } from "@/actions/recipes";
 import { parseIngredient } from "@/lib/ingredient-parser";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
+import { AiPromptInput } from "@/components/recipes/ai-prompt-input";
 import {
   RecipeForm,
   type RecipeFormValues,
@@ -19,6 +20,8 @@ import type { IngredientCategory, MealType } from "@/types/database";
 export default function NewRecipePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [generatedDefaults, setGeneratedDefaults] =
+    useState<Partial<RecipeFormValues> | null>(null);
 
   async function handleSubmit(values: RecipeFormValues) {
     setIsLoading(true);
@@ -109,7 +112,16 @@ export default function NewRecipePage() {
         </Button>
       </Header>
 
-      <RecipeForm onSubmit={handleSubmit} isLoading={isLoading} />
+      <div className="space-y-6">
+        <AiPromptInput onGenerated={setGeneratedDefaults} />
+
+        <RecipeForm
+          key={generatedDefaults?.name ?? "new"}
+          defaultValues={generatedDefaults ?? undefined}
+          onSubmit={handleSubmit}
+          isLoading={isLoading}
+        />
+      </div>
     </>
   );
 }
