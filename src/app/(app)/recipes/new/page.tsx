@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -22,6 +22,15 @@ export default function NewRecipePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedDefaults, setGeneratedDefaults] =
     useState<Partial<RecipeFormValues> | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  const handleGenerated = useCallback((data: Partial<RecipeFormValues>) => {
+    setGeneratedDefaults(data);
+    // Brief delay to let React re-render the form with new defaults
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  }, []);
 
   async function handleSubmit(values: RecipeFormValues) {
     setIsLoading(true);
@@ -113,14 +122,16 @@ export default function NewRecipePage() {
       </Header>
 
       <div className="space-y-6">
-        <AiPromptInput onGenerated={setGeneratedDefaults} />
+        <AiPromptInput onGenerated={handleGenerated} />
 
+        <div ref={formRef}>
         <RecipeForm
           key={generatedDefaults?.name ?? "new"}
           defaultValues={generatedDefaults ?? undefined}
           onSubmit={handleSubmit}
           isLoading={isLoading}
         />
+        </div>
       </div>
     </>
   );

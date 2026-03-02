@@ -7,6 +7,12 @@ import {
 } from "@/lib/recipe-prompt-builder";
 import type { RecipeFormValues } from "@/components/recipes/recipe-form";
 import type { IngredientCategory, Recipe } from "@/types/database";
+import {
+  calculateNutritionForIngredients,
+  type IngredientInput,
+} from "@/lib/nutrition";
+
+export const maxDuration = 60;
 
 function analyzePreferences(recipes: Recipe[]): UserPreferences {
   const cuisineCounts: Record<string, number> = {};
@@ -44,6 +50,52 @@ function analyzePreferences(recipes: Recipe[]): UserPreferences {
     topMealTypes: topN(mealTypeCounts, 3),
     commonTags: topN(tagCounts, 5),
     existingRecipeNames: recipeNames,
+  };
+}
+
+/** Transform parsed AI JSON into RecipeFormValues shape. */
+function transformToFormValues(
+  recipe: Record<string, unknown>
+): Partial<RecipeFormValues> {
+  const ingredients = (
+    recipe.ingredients as Array<Record<string, unknown>>
+  ).map((ing, index) => ({
+    name: String(ing.name ?? ""),
+    quantity: typeof ing.quantity === "number" ? ing.quantity : null,
+    unit: typeof ing.unit === "string" ? ing.unit : null,
+    category: String(ing.category ?? "other") as IngredientCategory,
+    notes: typeof ing.notes === "string" ? ing.notes : null,
+    is_optional: Boolean(ing.is_optional),
+    raw_text: String(ing.raw_text ?? ing.name ?? ""),
+    sort_order: index,
+  }));
+
+  return {
+    name: String(recipe.name),
+    cuisine_type:
+      typeof recipe.cuisine_type === "string" ? recipe.cuisine_type : "",
+    protein_type:
+      typeof recipe.protein_type === "string" ? recipe.protein_type : "",
+    meal_type: Array.isArray(recipe.meal_type) ? recipe.meal_type : [],
+    prep_time: typeof recipe.prep_time === "number" ? recipe.prep_time : "",
+    cook_time: typeof recipe.cook_time === "number" ? recipe.cook_time : "",
+    servings: typeof recipe.servings === "number" ? recipe.servings : "",
+    instructions: Array.isArray(recipe.instructions)
+      ? (recipe.instructions as string[]).join("\n")
+      : "",
+    tags: Array.isArray(recipe.tags)
+      ? (recipe.tags as string[]).join(", ")
+      : "",
+    notes: typeof recipe.notes === "string" ? recipe.notes : "",
+    source_url: "",
+    image_url: "",
+    is_favorite: false,
+    ingredients,
+    calories: "",
+    protein_g: "",
+    carbs_g: "",
+    fat_g: "",
+    nutrition_source: "",
   };
 }
 
@@ -133,7 +185,7 @@ export async function POST(request: Request) {
       userPreferences,
     });
 
-    // Call AI API
+    // Check AI env vars
     const apiKey = process.env.AI_API_KEY;
     const baseURL = process.env.AI_BASE_URL;
     const model = process.env.AI_MODEL;
@@ -148,104 +200,149 @@ export async function POST(request: Request) {
 
     const client = new OpenAI({ baseURL, apiKey });
 
-    const completion = await client.chat.completions.create({
-      model,
-      max_tokens: 2048,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
+    // Create streaming completion — if connection fails, return regular JSON error
+    let stream: Awaited<
+      ReturnType<typeof client.chat.completions.create>
+    >;
+    try {
+      stream = await client.chat.completions.create({
+        model,
+        max_tokens: 2048,
+        stream: true,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+    } catch (err) {
+      console.error("Failed to connect to AI provider:", err);
+      return NextResponse.json(
+        { error: "Failed to connect to AI service. Please try again." },
+        { status: 502 }
+      );
+    }
+
+    // Stream response via SSE
+    const encoder = new TextEncoder();
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        let fullContent = "";
+
+        try {
+          for await (const chunk of stream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
+            const token = chunk.choices[0]?.delta?.content;
+            if (token) {
+              fullContent += token;
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ token })}\n\n`)
+              );
+            }
+          }
+
+          // Stream complete — parse and validate
+          const jsonStr = fullContent
+            .replace(/^```(?:json)?\s*\n?/i, "")
+            .replace(/\n?```\s*$/i, "")
+            .trim();
+
+          let recipe: Record<string, unknown>;
+          try {
+            recipe = JSON.parse(jsonStr);
+          } catch {
+            console.error("Failed to parse AI response:", fullContent);
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ error: "AI returned invalid recipe data. Please try again." })}\n\n`
+              )
+            );
+            return;
+          }
+
+          if (
+            !recipe.name ||
+            typeof recipe.name !== "string" ||
+            !Array.isArray(recipe.ingredients) ||
+            recipe.ingredients.length === 0
+          ) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ error: "AI returned incomplete recipe data. Please try again." })}\n\n`
+              )
+            );
+            return;
+          }
+
+          // Transform to form values
+          const formValues = transformToFormValues(recipe);
+
+          // USDA nutrition fallback
+          if (formValues.ingredients && formValues.ingredients.length > 0) {
+            const servings =
+              typeof recipe.servings === "number" ? recipe.servings : 1;
+            const nutritionInputs: IngredientInput[] =
+              formValues.ingredients.map((ing) => ({
+                name: ing.name,
+                quantity: ing.quantity,
+                unit: ing.unit,
+              }));
+
+            try {
+              const nutrition = await calculateNutritionForIngredients(
+                nutritionInputs,
+                servings
+              );
+
+              if (nutrition.calories !== null) {
+                formValues.calories = nutrition.calories;
+                formValues.protein_g = nutrition.protein_g ?? "";
+                formValues.carbs_g = nutrition.carbs_g ?? "";
+                formValues.fat_g = nutrition.fat_g ?? "";
+                formValues.nutrition_source = "usda";
+              }
+            } catch (err) {
+              // Non-fatal — just skip nutrition
+              console.warn("USDA nutrition calculation failed:", err);
+            }
+          }
+
+          // Increment generation count after successful generation
+          if (!profile.ai_unlimited) {
+            await supabase
+              .from("profiles")
+              .update({ ai_generation_count: currentCount + 1 })
+              .eq("user_id", user.id);
+          }
+
+          const remaining = profile.ai_unlimited
+            ? null
+            : DAILY_LIMIT - (currentCount + 1);
+
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ done: true, data: formValues, remaining })}\n\n`
+            )
+          );
+        } catch (err) {
+          console.error("Stream error:", err);
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ error: "Stream interrupted. Please try again." })}\n\n`
+            )
+          );
+        } finally {
+          controller.close();
+        }
+      },
     });
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      return NextResponse.json(
-        { error: "No response from AI" },
-        { status: 422 }
-      );
-    }
-
-    // Strip markdown code fences if present (e.g. ```json ... ```)
-    const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-
-    // Parse JSON response
-    let recipe: Record<string, unknown>;
-    try {
-      recipe = JSON.parse(jsonStr);
-    } catch {
-      console.error("Failed to parse AI response:", content);
-      return NextResponse.json(
-        { error: "AI returned invalid recipe data. Please try again." },
-        { status: 422 }
-      );
-    }
-
-    // Validate required fields
-    if (
-      !recipe.name ||
-      typeof recipe.name !== "string" ||
-      !Array.isArray(recipe.ingredients) ||
-      recipe.ingredients.length === 0
-    ) {
-      return NextResponse.json(
-        { error: "AI returned incomplete recipe data. Please try again." },
-        { status: 422 }
-      );
-    }
-
-    // Transform to RecipeFormValues shape
-    const ingredients = (
-      recipe.ingredients as Array<Record<string, unknown>>
-    ).map((ing, index) => ({
-      name: String(ing.name ?? ""),
-      quantity: typeof ing.quantity === "number" ? ing.quantity : null,
-      unit: typeof ing.unit === "string" ? ing.unit : null,
-      category: String(ing.category ?? "other") as IngredientCategory,
-      notes: typeof ing.notes === "string" ? ing.notes : null,
-      is_optional: Boolean(ing.is_optional),
-      raw_text: String(ing.raw_text ?? ing.name ?? ""),
-      sort_order: index,
-    }));
-
-    const formValues: Partial<RecipeFormValues> = {
-      name: String(recipe.name),
-      cuisine_type:
-        typeof recipe.cuisine_type === "string" ? recipe.cuisine_type : "",
-      protein_type:
-        typeof recipe.protein_type === "string" ? recipe.protein_type : "",
-      meal_type: Array.isArray(recipe.meal_type) ? recipe.meal_type : [],
-      prep_time: typeof recipe.prep_time === "number" ? recipe.prep_time : "",
-      cook_time: typeof recipe.cook_time === "number" ? recipe.cook_time : "",
-      servings: typeof recipe.servings === "number" ? recipe.servings : "",
-      instructions: Array.isArray(recipe.instructions)
-        ? (recipe.instructions as string[]).join("\n")
-        : "",
-      tags: Array.isArray(recipe.tags)
-        ? (recipe.tags as string[]).join(", ")
-        : "",
-      notes: typeof recipe.notes === "string" ? recipe.notes : "",
-      source_url: "",
-      image_url: "",
-      is_favorite: false,
-      ingredients,
-      calories: "",
-      protein_g: "",
-      carbs_g: "",
-      fat_g: "",
-      nutrition_source: "",
-    };
-
-    // Increment generation count after successful generation
-    if (!profile.ai_unlimited) {
-      await supabase
-        .from("profiles")
-        .update({ ai_generation_count: currentCount + 1 })
-        .eq("user_id", user.id);
-    }
-
-    const remaining = profile.ai_unlimited ? null : DAILY_LIMIT - (currentCount + 1);
-
-    return NextResponse.json({ data: formValues, remaining });
+    return new Response(readableStream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      },
+    });
   } catch (err) {
     console.error("Error generating recipe:", err);
     return NextResponse.json(
