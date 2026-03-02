@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 import { formatPartialRecipeJson } from "@/lib/stream-recipe-formatter";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -53,7 +52,7 @@ export function StreamingRecipePreview({
     recipe.instructions.length > 0;
 
   return (
-    <div className="mt-3 rounded-lg border border-dashed border-primary/30 bg-card p-4">
+    <div className="mt-3 overflow-hidden rounded-lg border border-dashed border-primary/30 bg-card p-4">
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         {isStreaming ? (
@@ -73,7 +72,7 @@ export function StreamingRecipePreview({
         )}
       </div>
 
-      <ScrollArea className="max-h-80">
+      <div className="max-h-80 overflow-y-auto">
         {hasAnyField ? (
           <div className="space-y-3">
             {/* Name */}
@@ -152,7 +151,7 @@ export function StreamingRecipePreview({
         ) : (
           /* Fallback: raw text when no fields parsed yet */
           <div className="space-y-2">
-            <pre className="whitespace-pre-wrap font-mono text-xs text-muted-foreground">
+            <pre className="break-all whitespace-pre-wrap font-mono text-xs text-muted-foreground">
               {text}
             </pre>
             {isStreaming && (
@@ -161,7 +160,7 @@ export function StreamingRecipePreview({
           </div>
         )}
         <div ref={bottomRef} />
-      </ScrollArea>
+      </div>
     </div>
   );
 }
