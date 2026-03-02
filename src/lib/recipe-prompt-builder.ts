@@ -67,7 +67,7 @@ Return ONLY a raw JSON object (no markdown, no code fences, no explanation) matc
 {
   "name": "string — recipe title",
   "cuisine_type": "string | null — one of: italian, mexican, indian, chinese, japanese, thai, mediterranean, american, french, korean, vietnamese, middle_eastern, greek, spanish, ethiopian, caribbean, british, german, brazilian, other",
-  "protein_type": "string | null — one of: chicken, beef, pork, fish, shrimp, tofu, lamb, turkey, eggs, lentils, beans, none, other",
+  "protein_type": "string | null — one of: chicken, beef, pork, fish, shrimp, tofu, paneer, chickpeas, lentils, lamb, turkey, eggs, beans, none, other",
   "meal_type": ["array of: breakfast, lunch, dinner, snack"],
   "prep_time": "number | null — minutes",
   "cook_time": "number | null — minutes",
