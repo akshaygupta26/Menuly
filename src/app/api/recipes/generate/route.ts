@@ -126,10 +126,13 @@ export async function POST(request: Request) {
       );
     }
 
+    // Strip markdown code fences if present (e.g. ```json ... ```)
+    const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+
     // Parse JSON response
     let recipe: Record<string, unknown>;
     try {
-      recipe = JSON.parse(content);
+      recipe = JSON.parse(jsonStr);
     } catch {
       console.error("Failed to parse AI response:", content);
       return NextResponse.json(
