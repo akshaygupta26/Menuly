@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, X } from "lucide-react";
 
 import { formatPartialRecipeJson } from "@/lib/stream-recipe-formatter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface StreamingRecipePreviewProps {
   text: string;
@@ -20,18 +21,11 @@ export function StreamingRecipePreview({
   error,
   onDismiss,
 }: StreamingRecipePreviewProps) {
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll to bottom as content appears
-  useEffect(() => {
-    if (isStreaming) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [text, isStreaming]);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   if (error) {
     return (
-      <div className="mt-3 rounded-lg border border-destructive/50 bg-destructive/5 p-4">
+      <div className="mt-3 rounded-lg border border-destructive/50 bg-destructive/5 px-4 py-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-destructive">
             Generation failed
@@ -46,122 +40,151 @@ export function StreamingRecipePreview({
   }
 
   const recipe = formatPartialRecipeJson(text);
-  const hasAnyField =
-    recipe.name ||
-    recipe.ingredients.length > 0 ||
-    recipe.instructions.length > 0;
+
+  // Summary line: show recipe name or a count of what's been generated so far
+  const summaryParts: string[] = [];
+  if (recipe.name) summaryParts.push(recipe.name);
+  if (recipe.ingredients.length > 0)
+    summaryParts.push(`${recipe.ingredients.length} ingredients`);
+  if (recipe.instructions.length > 0)
+    summaryParts.push(`${recipe.instructions.length} steps`);
+
+  const summary = summaryParts.join(" · ");
 
   return (
-    <div className="mt-3 overflow-hidden rounded-lg border border-dashed border-primary/30 bg-card p-4">
-      {/* Header */}
-      <div className="mb-3 flex items-center justify-between">
-        {isStreaming ? (
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <span className="inline-block size-2 animate-pulse rounded-full bg-primary" />
-            Generating recipe…
-          </div>
-        ) : (
-          <p className="text-sm font-medium text-muted-foreground">
-            Recipe preview
-          </p>
+    <div className="mt-3 overflow-hidden rounded-lg border border-primary/20 bg-card">
+      {/* Compact bar — always visible */}
+      <button
+        type="button"
+        onClick={() => setIsExpanded((prev) => !prev)}
+        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-muted/50"
+      >
+        {/* Pulsing dot while streaming */}
+        {isStreaming && (
+          <span className="relative flex size-2 shrink-0">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary/60" />
+            <span className="inline-flex size-2 rounded-full bg-primary" />
+          </span>
         )}
-        {!isStreaming && (
-          <Button variant="ghost" size="icon" className="size-6" onClick={onDismiss}>
-            <X className="size-3.5" />
-          </Button>
-        )}
-      </div>
 
-      <div className="max-h-80 overflow-y-auto">
-        {hasAnyField ? (
-          <div className="space-y-3">
-            {/* Name */}
-            {recipe.name && (
-              <h3 className="text-lg font-semibold">{recipe.name}</h3>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-muted-foreground">
+          {isStreaming
+            ? summary
+              ? `Generating: ${summary}`
+              : "Generating recipe…"
+            : summary || "Recipe preview"}
+        </span>
+
+        <div className="flex shrink-0 items-center gap-1">
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground transition-transform",
+              isExpanded && "rotate-180"
             )}
+          />
+          {!isStreaming && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDismiss();
+              }}
+            >
+              <X className="size-3.5" />
+            </Button>
+          )}
+        </div>
+      </button>
 
-            {/* Metadata line */}
-            {(recipe.cuisine_type ||
-              recipe.protein_type ||
-              recipe.prep_time ||
-              recipe.cook_time ||
-              recipe.servings) && (
-              <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
-                {recipe.cuisine_type && <span>{recipe.cuisine_type}</span>}
-                {recipe.protein_type && <span>{recipe.protein_type}</span>}
-                {recipe.prep_time != null && (
-                  <span>Prep: {recipe.prep_time}m</span>
-                )}
-                {recipe.cook_time != null && (
-                  <span>Cook: {recipe.cook_time}m</span>
-                )}
-                {recipe.servings != null && (
-                  <span>Serves {recipe.servings}</span>
-                )}
-              </div>
-            )}
+      {/* Expandable detail panel */}
+      {isExpanded && (
+        <div className="max-h-72 overflow-y-auto border-t px-4 py-3">
+          {recipe.name ||
+          recipe.ingredients.length > 0 ||
+          recipe.instructions.length > 0 ? (
+            <div className="space-y-3">
+              {recipe.name && (
+                <h3 className="text-base font-semibold">{recipe.name}</h3>
+              )}
 
-            {/* Ingredients */}
-            {recipe.ingredients.length > 0 && (
-              <div>
-                <p className="mb-1 text-sm font-medium">Ingredients</p>
-                <ul className="list-inside list-disc space-y-0.5 text-sm text-muted-foreground">
-                  {recipe.ingredients.map((ing, i) => (
-                    <li key={i}>{ing}</li>
+              {(recipe.cuisine_type ||
+                recipe.protein_type ||
+                recipe.prep_time != null ||
+                recipe.cook_time != null ||
+                recipe.servings != null) && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                  {recipe.cuisine_type && <span>{recipe.cuisine_type}</span>}
+                  {recipe.protein_type && <span>{recipe.protein_type}</span>}
+                  {recipe.prep_time != null && (
+                    <span>Prep: {recipe.prep_time}m</span>
+                  )}
+                  {recipe.cook_time != null && (
+                    <span>Cook: {recipe.cook_time}m</span>
+                  )}
+                  {recipe.servings != null && (
+                    <span>Serves {recipe.servings}</span>
+                  )}
+                </div>
+              )}
+
+              {recipe.ingredients.length > 0 && (
+                <div>
+                  <p className="mb-1 text-sm font-medium">Ingredients</p>
+                  <ul className="list-inside list-disc space-y-0.5 text-sm text-muted-foreground">
+                    {recipe.ingredients.map((ing, i) => (
+                      <li key={i}>{ing}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {recipe.instructions.length > 0 && (
+                <div>
+                  <p className="mb-1 text-sm font-medium">Instructions</p>
+                  <ol className="list-inside list-decimal space-y-0.5 text-sm text-muted-foreground">
+                    {recipe.instructions.map((step, i) => (
+                      <li key={i}>{step}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {recipe.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {recipe.tags.map((tag, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs">
+                      {tag}
+                    </Badge>
                   ))}
-                </ul>
-              </div>
-            )}
+                </div>
+              )}
 
-            {/* Instructions */}
-            {recipe.instructions.length > 0 && (
-              <div>
-                <p className="mb-1 text-sm font-medium">Instructions</p>
-                <ol className="list-inside list-decimal space-y-0.5 text-sm text-muted-foreground">
-                  {recipe.instructions.map((step, i) => (
-                    <li key={i}>{step}</li>
-                  ))}
-                </ol>
-              </div>
-            )}
+              {recipe.notes && (
+                <p className="text-sm italic text-muted-foreground">
+                  {recipe.notes}
+                </p>
+              )}
 
-            {/* Tags */}
-            {recipe.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {recipe.tags.map((tag, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            )}
-
-            {/* Notes */}
-            {recipe.notes && (
-              <p className="text-sm italic text-muted-foreground">
-                {recipe.notes}
-              </p>
-            )}
-
-            {/* Blinking cursor */}
-            {isStreaming && (
-              <span className="inline-block h-4 w-1.5 animate-pulse bg-primary/60" />
-            )}
-          </div>
-        ) : (
-          /* Skeleton loading state while waiting for first parseable field */
-          <div className="space-y-3 animate-pulse">
-            <div className="h-5 w-48 rounded bg-muted" />
-            <div className="h-3 w-32 rounded bg-muted" />
-            <div className="space-y-1.5">
-              <div className="h-3 w-full rounded bg-muted" />
-              <div className="h-3 w-5/6 rounded bg-muted" />
-              <div className="h-3 w-4/6 rounded bg-muted" />
+              {isStreaming && (
+                <span className="inline-block h-4 w-1.5 animate-pulse bg-primary/60" />
+              )}
             </div>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
+          ) : (
+            /* Skeleton while waiting for first field */
+            <div className="animate-pulse space-y-3">
+              <div className="h-5 w-48 rounded bg-muted" />
+              <div className="h-3 w-32 rounded bg-muted" />
+              <div className="space-y-1.5">
+                <div className="h-3 w-full rounded bg-muted" />
+                <div className="h-3 w-5/6 rounded bg-muted" />
+                <div className="h-3 w-4/6 rounded bg-muted" />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
