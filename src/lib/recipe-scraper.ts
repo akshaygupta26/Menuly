@@ -197,6 +197,15 @@ function cleanIngredientText(text: string): string {
 }
 
 /**
+ * Detect section headers like "For serving:", "For the sauce:", "Bolognese:"
+ * that appear in ingredient lists. Returns true if the text looks like a header
+ * rather than a real ingredient.
+ */
+function isSectionHeader(text: string): boolean {
+  return text.endsWith(":") && !/\d/.test(text) && text.length < 60;
+}
+
+/**
  * Parse ingredients list from schema. Handles array of strings or objects.
  */
 function parseIngredients(
@@ -208,7 +217,8 @@ function parseIngredients(
     return value
       .split(/\n/)
       .map((s) => cleanIngredientText(s))
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((s) => !isSectionHeader(s));
   }
 
   if (Array.isArray(value)) {
@@ -220,7 +230,8 @@ function parseIngredients(
         }
         return "";
       })
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((s) => !isSectionHeader(s));
   }
 
   return [];

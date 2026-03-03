@@ -7,7 +7,6 @@ import type {
   RecipeIngredient,
   RecipeHistory,
   MealType,
-  IngredientCategory,
 } from "@/types/database";
 
 // ---------------------------------------------------------------------------

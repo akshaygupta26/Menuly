@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import {
   Copy,
   Check,
@@ -47,7 +46,6 @@ const ALL_MEAL_SLOTS: { value: MealType; label: string }[] = [
 // ---------------------------------------------------------------------------
 
 export default function SettingsPage() {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   // Profile / Meal slots

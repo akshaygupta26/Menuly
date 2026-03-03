@@ -419,7 +419,45 @@ export async function getGroceryList(
 }
 
 // ---------------------------------------------------------------------------
-// 7. clearCheckedItems
+// 7. clearGroceryList
+// ---------------------------------------------------------------------------
+
+export async function clearGroceryList(
+  listId: string
+): Promise<ActionResult> {
+  const { supabase, user } = await getAuthenticatedUser();
+  if (!supabase || !user) {
+    return { data: null, error: "Not authenticated" };
+  }
+
+  // Verify list ownership
+  const { data: list, error: listError } = await supabase
+    .from("grocery_lists")
+    .select("id")
+    .eq("id", listId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (listError || !list) {
+    return { data: null, error: "List not found" };
+  }
+
+  const { error: deleteError } = await supabase
+    .from("grocery_items")
+    .delete()
+    .eq("grocery_list_id", listId);
+
+  if (deleteError) {
+    return { data: null, error: deleteError.message };
+  }
+
+  revalidatePath("/grocery");
+
+  return { data: null, error: null };
+}
+
+// ---------------------------------------------------------------------------
+// 8. clearCheckedItems
 // ---------------------------------------------------------------------------
 
 export async function clearCheckedItems(

@@ -73,13 +73,21 @@ export function RecipePickerDialog({
     });
   }, []);
 
+  // Reset state when dialog opens (adjusting state during render pattern)
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open && !prevOpen) {
+    setPrevOpen(true);
+    setSearch("");
+    setMealTypeFilter(null);
+    setIsCustom(false);
+    setCustomName("");
+  } else if (!open && prevOpen) {
+    setPrevOpen(false);
+  }
+
   useEffect(() => {
     if (open) {
       fetchRecipes();
-      setSearch("");
-      setMealTypeFilter(null);
-      setIsCustom(false);
-      setCustomName("");
     }
   }, [open, fetchRecipes]);
 

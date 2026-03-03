@@ -1,16 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ListX, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
 import {
   addManualItem,
+  clearGroceryList,
   removeGroceryItem,
 } from "@/actions/grocery";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AddItemInput } from "@/components/grocery/add-item-input";
 import type { GroceryList, GroceryItem, IngredientCategory } from "@/types/database";
 
@@ -119,6 +128,7 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
     }
   });
   const [isPending, startTransition] = useTransition();
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
   const [dismissingIds, setDismissingIds] = useState<Set<string>>(new Set());
   const dismissTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -247,9 +257,22 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
   // ---- Render ----
   return (
     <div className="space-y-6">
-      {/* Item count */}
-      <div className="text-sm text-muted-foreground">
-        {totalCount} item{totalCount !== 1 ? "s" : ""} remaining
+      {/* Item count + clear button */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          {totalCount} item{totalCount !== 1 ? "s" : ""} remaining
+        </div>
+        {totalCount > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive"
+            onClick={() => setShowClearAllConfirm(true)}
+          >
+            <ListX className="mr-1.5 size-4" />
+            Clear List
+          </Button>
+        )}
       </div>
 
       {/* Category groups */}
@@ -346,6 +369,40 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
         <AddItemInput onAdd={handleAdd} />
       </div>
 
+      {/* Clear list confirmation dialog */}
+      <Dialog open={showClearAllConfirm} onOpenChange={setShowClearAllConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear grocery list?</DialogTitle>
+            <DialogDescription>
+              This will remove all {totalCount} item{totalCount !== 1 ? "s" : ""} from your grocery list. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowClearAllConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isPending}
+              onClick={() => {
+                setShowClearAllConfirm(false);
+                startTransition(async () => {
+                  dispatchOptimistic({ type: "sync", items: [] });
+                  const result = await clearGroceryList(initialList.id);
+                  if (result.error) {
+                    toast.error("Failed to clear list");
+                  } else {
+                    toast.success("Grocery list cleared");
+                  }
+                });
+              }}
+            >
+              Clear All
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

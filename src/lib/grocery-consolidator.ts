@@ -1,4 +1,4 @@
-import type { IngredientCategory, GroceryItem, RecipeIngredient } from "@/types/database";
+import type { IngredientCategory, RecipeIngredient } from "@/types/database";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -141,35 +141,6 @@ function normalizeName(raw: string): string {
 interface QuantityUnit {
   quantity: number;
   unit: string;
-}
-
-/**
- * Convert a quantity from one unit to a preferred display unit within the same
- * family. Returns the converted value or null if conversion is not possible.
- */
-function convertToPreferredUnit(
-  qty: number,
-  fromUnit: string,
-  toUnit: string
-): number | null {
-  const family = getUnitFamily(fromUnit);
-  if (family !== getUnitFamily(toUnit)) return null;
-
-  if (family === "volume") {
-    const fromFactor = VOLUME_TO_TSP[fromUnit];
-    const toFactor = VOLUME_TO_TSP[toUnit];
-    if (fromFactor == null || toFactor == null) return null;
-    return (qty * fromFactor) / toFactor;
-  }
-
-  if (family === "weight") {
-    const fromFactor = WEIGHT_TO_G[fromUnit];
-    const toFactor = WEIGHT_TO_G[toUnit];
-    if (fromFactor == null || toFactor == null) return null;
-    return (qty * fromFactor) / toFactor;
-  }
-
-  return null;
 }
 
 /**

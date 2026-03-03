@@ -222,7 +222,7 @@ export function MealPlanClient({
   function handleGenerateGroceryList() {
     if (!mealPlan) return;
     startTransition(async () => {
-      const { data, error } = await generateGroceryList(mealPlan!.id);
+      const { error } = await generateGroceryList(mealPlan!.id);
 
       if (error) {
         toast.error(error);

@@ -7,7 +7,6 @@ import type {
   MealPlanItem,
   MealPlanItemWithRecipe,
   MealType,
-  Recipe,
 } from "@/types/database";
 
 // ---------------------------------------------------------------------------
@@ -20,6 +19,10 @@ type ActionResult<T = null> =
 
 interface MealPlanWithItems extends MealPlan {
   items: MealPlanItemWithRecipe[];
+}
+
+interface MealPlanItemWithOwner {
+  meal_plan: { user_id: string } | null;
 }
 
 interface PickerRecipe {
@@ -68,7 +71,7 @@ export async function getMealPlan(
   }
 
   // Try to find an existing meal plan for this week
-  let { data: mealPlan, error: fetchError } = await supabase
+  const { data: existingPlan, error: fetchError } = await supabase
     .from("meal_plans")
     .select("*")
     .eq("user_id", user.id)
@@ -79,6 +82,8 @@ export async function getMealPlan(
     // PGRST116 = "no rows returned" — that's OK, we'll create one
     return { data: null, error: fetchError.message };
   }
+
+  let mealPlan = existingPlan;
 
   // Create the meal plan if it doesn't exist
   if (!mealPlan) {
@@ -201,7 +206,7 @@ export async function updateMealPlanItem(
     return { data: null, error: "Meal plan item not found" };
   }
 
-  if ((existing as any).meal_plan?.user_id !== user.id) {
+  if ((existing as unknown as MealPlanItemWithOwner).meal_plan?.user_id !== user.id) {
     return { data: null, error: "Meal plan item not found" };
   }
 
@@ -257,7 +262,7 @@ export async function removeMealPlanItem(
     return { data: null, error: "Meal plan item not found" };
   }
 
-  if ((existing as any).meal_plan?.user_id !== user.id) {
+  if ((existing as unknown as MealPlanItemWithOwner).meal_plan?.user_id !== user.id) {
     return { data: null, error: "Meal plan item not found" };
   }
 

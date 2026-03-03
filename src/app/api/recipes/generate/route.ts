@@ -91,11 +91,11 @@ function transformToFormValues(
     image_url: "",
     is_favorite: false,
     ingredients,
-    calories: "",
-    protein_g: "",
-    carbs_g: "",
-    fat_g: "",
-    nutrition_source: "",
+    calories: typeof recipe.calories === "number" ? recipe.calories : "",
+    protein_g: typeof recipe.protein_g === "number" ? recipe.protein_g : "",
+    carbs_g: typeof recipe.carbs_g === "number" ? recipe.carbs_g : "",
+    fat_g: typeof recipe.fat_g === "number" ? recipe.fat_g : "",
+    nutrition_source: typeof recipe.calories === "number" ? "manual" : "",
   };
 }
 
@@ -298,6 +298,8 @@ export async function POST(request: Request) {
                 formValues.carbs_g = nutrition.carbs_g ?? "";
                 formValues.fat_g = nutrition.fat_g ?? "";
                 formValues.nutrition_source = "usda";
+              } else {
+                console.log("USDA nutrition returned no data — keeping AI estimates if available");
               }
             } catch (err) {
               // Non-fatal — just skip nutrition

@@ -93,7 +93,7 @@ Return ONLY a raw JSON object (no markdown, no code fences, no explanation) matc
 }
 
 Rules:
-- Always leave nutrition fields (calories, protein_g, carbs_g, fat_g) as null — the user has a separate tool for that.
+- Provide your best estimate for nutrition fields (calories, protein_g, carbs_g, fat_g) as integers per serving. If unsure, leave as null.
 - Default servings to ${servings} unless the user specifies otherwise.
 - Use metric-friendly units where sensible, but respect common cooking conventions (cups for flour, etc.).
 - Put preparation details (e.g. "diced", "minced") in the ingredient "notes" field, NOT in "name".
