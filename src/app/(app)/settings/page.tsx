@@ -19,6 +19,7 @@ import { logout } from "@/actions/auth";
 import type { MealType } from "@/types/database";
 
 import { Header } from "@/components/layout/header";
+import { HouseholdSection } from "@/components/household/household-section";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -46,7 +47,8 @@ const ALL_MEAL_SLOTS: { value: MealType; label: string }[] = [
 // ---------------------------------------------------------------------------
 
 export default function SettingsPage() {
-  const [isPending, startTransition] = useTransition();
+  const [isMealPending, startMealTransition] = useTransition();
+  const [isLogoutPending, startLogoutTransition] = useTransition();
 
   // Profile / Meal slots
   const [mealSlots, setMealSlots] = useState<MealType[]>([]);
@@ -102,7 +104,7 @@ export default function SettingsPage() {
 
     setMealSlots(next);
 
-    startTransition(async () => {
+    startMealTransition(async () => {
       const { error } = await updateMealSlots(next);
       if (error) {
         toast.error(error);
@@ -126,7 +128,7 @@ export default function SettingsPage() {
   }
 
   function handleLogout() {
-    startTransition(async () => {
+    startLogoutTransition(async () => {
       await logout();
     });
   }
@@ -169,7 +171,7 @@ export default function SettingsPage() {
                       <Checkbox
                         id={`slot-${slot.value}`}
                         checked={isChecked}
-                        disabled={isPending}
+                        disabled={isMealPending}
                         onCheckedChange={(checked) =>
                           handleToggleMealSlot(slot.value, checked === true)
                         }
@@ -201,6 +203,11 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* ================================================================ */}
+        {/* Household                                                        */}
+        {/* ================================================================ */}
+        <HouseholdSection />
 
         {/* ================================================================ */}
         {/* Apple Reminders Sync                                             */}
@@ -268,11 +275,38 @@ export default function SettingsPage() {
               </p>
             </div>
 
+            {/* Quick copy for shortcut setup */}
+            {accessToken && (
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() =>
+                    copyToClipboard(
+                      `Bearer ${accessToken}`,
+                      "bearer"
+                    )
+                  }
+                >
+                  {copiedField === "bearer" ? (
+                    <Check className="size-4 text-green-600" />
+                  ) : (
+                    <Copy className="size-4" />
+                  )}
+                  Copy Authorization Header Value
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Copies <code className="rounded bg-muted px-1">Bearer &lt;token&gt;</code> ready to paste into the Shortcut header.
+                </p>
+              </div>
+            )}
+
             {/* Setup Guide */}
             <div className="rounded-lg border">
               <button
                 type="button"
                 onClick={() => setGuideOpen(!guideOpen)}
+                aria-expanded={guideOpen}
                 className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors"
               >
                 <span>Setup Guide for iOS Shortcuts</span>
@@ -376,10 +410,10 @@ export default function SettingsPage() {
             <Button
               variant="destructive"
               onClick={handleLogout}
-              disabled={isPending}
+              disabled={isLogoutPending}
             >
               <LogOut className="size-4" />
-              Log Out
+              {isLogoutPending ? "Logging out..." : "Log Out"}
             </Button>
           </CardContent>
         </Card>

@@ -287,6 +287,8 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
               <button
                 type="button"
                 onClick={() => toggleCategory(category)}
+                aria-expanded={!isCollapsed}
+                aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${CATEGORY_LABELS[category]}`}
                 className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-muted/50 transition-colors"
               >
                 {isCollapsed ? (
@@ -321,6 +323,7 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
                             checked={isDismissing}
                             onCheckedChange={() => handleCheck(item.id)}
                             disabled={isDismissing}
+                            aria-label={`Mark ${item.name} as done`}
                           />
                           <div className="flex-1 min-w-0">
                             <span
@@ -350,7 +353,7 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
                             onClick={() => handleRemove(item.id)}
                           >
                             <Trash2 className="size-3.5 text-muted-foreground" />
-                            <span className="sr-only">Remove</span>
+                            <span className="sr-only">Remove {item.name}</span>
                           </Button>
                         </li>
                       );

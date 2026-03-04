@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { createClient } from "@/lib/supabase/client";
 import type {
   MealPlan,
   MealPlanItemWithRecipe,
@@ -71,6 +72,39 @@ export function MealPlanClient({
   useEffect(() => {
     setMealPlan(initialMealPlan);
   }, [initialMealPlan]);
+
+  // Realtime subscription for meal_plan_items — enables live sync for
+  // household members editing the same plan.
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!mealPlan) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`meal_plan_items:${mealPlan.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "meal_plan_items",
+          filter: `meal_plan_id=eq.${mealPlan.id}`,
+        },
+        () => {
+          // Debounce rapid changes (e.g. auto-generate inserts many rows)
+          if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+          refreshTimerRef.current = setTimeout(() => {
+            router.refresh();
+          }, 300);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [mealPlan?.id, router]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);

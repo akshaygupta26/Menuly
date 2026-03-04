@@ -53,18 +53,21 @@ export function AddItemInput({ onAdd }: AddItemInputProps) {
 
   return (
     <form onSubmit={handleSubmit} className="flex items-center gap-2">
+      <label htmlFor="grocery-item-name" className="sr-only">Item name</label>
       <Input
+        id="grocery-item-name"
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Add an item..."
         className="flex-1"
         maxLength={100}
       />
+      <label htmlFor="grocery-item-category" className="sr-only">Category</label>
       <Select
         value={category}
         onValueChange={(val) => setCategory(val as IngredientCategory)}
       >
-        <SelectTrigger className="w-[140px]" size="default">
+        <SelectTrigger id="grocery-item-category" className="w-[140px]" size="default">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

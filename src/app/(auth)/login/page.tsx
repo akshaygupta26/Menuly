@@ -265,7 +265,7 @@ export default function LoginPage() {
                     setError(null);
                     setMessage(null);
                   }}
-                  className="block w-full hover:text-foreground transition-colors"
+                  className="block w-full min-h-[44px] py-2 hover:text-foreground transition-colors"
                 >
                   Forgot your password?
                 </button>
@@ -276,7 +276,7 @@ export default function LoginPage() {
                     setError(null);
                     setMessage(null);
                   }}
-                  className="block w-full hover:text-foreground transition-colors"
+                  className="block w-full min-h-[44px] py-2 hover:text-foreground transition-colors"
                 >
                   Sign in with email link instead
                 </button>
@@ -287,7 +287,7 @@ export default function LoginPage() {
                     setError(null);
                     setMessage(null);
                   }}
-                  className="block w-full hover:text-foreground transition-colors"
+                  className="block w-full min-h-[44px] py-2 hover:text-foreground transition-colors"
                 >
                   Don&apos;t have an account?{" "}
                   <span className="font-medium text-[#C4704B]">Sign up</span>
@@ -303,7 +303,7 @@ export default function LoginPage() {
                   setError(null);
                   setMessage(null);
                 }}
-                className="block w-full hover:text-foreground transition-colors"
+                className="block w-full min-h-[44px] py-2 hover:text-foreground transition-colors"
               >
                 Already have an account?{" "}
                 <span className="font-medium text-[#C4704B]">Sign in</span>
@@ -318,7 +318,7 @@ export default function LoginPage() {
                   setError(null);
                   setMessage(null);
                 }}
-                className="block w-full hover:text-foreground transition-colors"
+                className="block w-full min-h-[44px] py-2 hover:text-foreground transition-colors"
               >
                 Back to sign in
               </button>

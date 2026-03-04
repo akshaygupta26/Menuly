@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getHouseholdContext, applyOwnershipFilter } from "@/lib/household-context";
 import type {
   Recipe,
   RecipeIngredient,
@@ -22,7 +23,7 @@ interface RecipeFilters {
   tags?: string[];
 }
 
-type RecipeInput = Omit<Recipe, "id" | "user_id" | "created_at" | "updated_at" | "last_made_date" | "times_made">;
+type RecipeInput = Omit<Recipe, "id" | "user_id" | "household_id" | "created_at" | "updated_at" | "last_made_date" | "times_made">;
 
 type RecipeIngredientInput = Omit<RecipeIngredient, "id" | "recipe_id">;
 
@@ -70,11 +71,12 @@ export async function getRecipes(
     return { data: null, error: "Not authenticated" };
   }
 
-  let query = supabase
-    .from("recipes")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("name");
+  const ctx = await getHouseholdContext(supabase, user.id);
+
+  let query = applyOwnershipFilter(
+    supabase.from("recipes").select("*"),
+    ctx
+  ).order("name");
 
   if (filters?.search) {
     query = query.ilike("name", `%${filters.search}%`);
@@ -121,12 +123,12 @@ export async function getRecipe(
     return { data: null, error: "Not authenticated" };
   }
 
-  const { data: recipe, error: recipeError } = await supabase
-    .from("recipes")
-    .select("*")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .single();
+  const ctx = await getHouseholdContext(supabase, user.id);
+
+  const { data: recipe, error: recipeError } = await applyOwnershipFilter(
+    supabase.from("recipes").select("*").eq("id", id),
+    ctx
+  ).single();
 
   if (recipeError) {
     return { data: null, error: recipeError.message };
@@ -163,12 +165,15 @@ export async function createRecipe(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Insert the recipe
   const { data: newRecipe, error: recipeError } = await supabase
     .from("recipes")
     .insert({
       ...data.recipe,
       user_id: user.id,
+      household_id: ctx.householdId,
     })
     .select("id")
     .single();
@@ -213,13 +218,13 @@ export async function updateRecipe(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Verify ownership
-  const { data: existing, error: fetchError } = await supabase
-    .from("recipes")
-    .select("id")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .single();
+  const { data: existing, error: fetchError } = await applyOwnershipFilter(
+    supabase.from("recipes").select("id").eq("id", id),
+    ctx
+  ).single();
 
   if (fetchError || !existing) {
     return { data: null, error: "Recipe not found" };
@@ -227,11 +232,10 @@ export async function updateRecipe(
 
   // Update recipe fields
   if (data.recipe) {
-    const { error: updateError } = await supabase
-      .from("recipes")
-      .update(data.recipe)
-      .eq("id", id)
-      .eq("user_id", user.id);
+    const { error: updateError } = await applyOwnershipFilter(
+      supabase.from("recipes").update(data.recipe).eq("id", id),
+      ctx
+    );
 
     if (updateError) {
       return { data: null, error: updateError.message };
@@ -283,15 +287,15 @@ export async function deleteRecipe(id: string): Promise<ActionResult> {
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Fetch recipe name so we can preserve it in any meal plan items.
   // The FK is ON DELETE SET NULL, which would violate the check constraint
   // (recipe_id IS NOT NULL OR custom_name IS NOT NULL) if custom_name is NULL.
-  const { data: recipe } = await supabase
-    .from("recipes")
-    .select("name")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .single();
+  const { data: recipe } = await applyOwnershipFilter(
+    supabase.from("recipes").select("name").eq("id", id),
+    ctx
+  ).single();
 
   if (recipe) {
     await supabase
@@ -301,11 +305,10 @@ export async function deleteRecipe(id: string): Promise<ActionResult> {
       .is("custom_name", null);
   }
 
-  const { error } = await supabase
-    .from("recipes")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
+  const { error } = await applyOwnershipFilter(
+    supabase.from("recipes").delete().eq("id", id),
+    ctx
+  );
 
   if (error) {
     return { data: null, error: error.message };
@@ -329,13 +332,13 @@ export async function toggleFavorite(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Get current value
-  const { data: recipe, error: fetchError } = await supabase
-    .from("recipes")
-    .select("is_favorite")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .single();
+  const { data: recipe, error: fetchError } = await applyOwnershipFilter(
+    supabase.from("recipes").select("is_favorite").eq("id", id),
+    ctx
+  ).single();
 
   if (fetchError || !recipe) {
     return { data: null, error: "Recipe not found" };
@@ -343,11 +346,10 @@ export async function toggleFavorite(
 
   const newValue = !recipe.is_favorite;
 
-  const { error: updateError } = await supabase
-    .from("recipes")
-    .update({ is_favorite: newValue })
-    .eq("id", id)
-    .eq("user_id", user.id);
+  const { error: updateError } = await applyOwnershipFilter(
+    supabase.from("recipes").update({ is_favorite: newValue }).eq("id", id),
+    ctx
+  );
 
   if (updateError) {
     return { data: null, error: updateError.message };
@@ -373,13 +375,13 @@ export async function markAsMade(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Verify ownership
-  const { data: recipe, error: fetchError } = await supabase
-    .from("recipes")
-    .select("id")
-    .eq("id", recipeId)
-    .eq("user_id", user.id)
-    .single();
+  const { data: recipe, error: fetchError } = await applyOwnershipFilter(
+    supabase.from("recipes").select("id").eq("id", recipeId),
+    ctx
+  ).single();
 
   if (fetchError || !recipe) {
     return { data: null, error: "Recipe not found" };
@@ -388,6 +390,7 @@ export async function markAsMade(
   const { error } = await supabase.from("recipe_history").insert({
     recipe_id: recipeId,
     user_id: user.id,
+    household_id: ctx.householdId,
     made_date: new Date().toISOString(),
     rating: rating ?? null,
     notes: notes ?? null,
@@ -415,12 +418,12 @@ export async function getRecipeHistory(
     return { data: null, error: "Not authenticated" };
   }
 
-  const { data, error } = await supabase
-    .from("recipe_history")
-    .select("*")
-    .eq("recipe_id", recipeId)
-    .eq("user_id", user.id)
-    .order("made_date", { ascending: false });
+  const ctx = await getHouseholdContext(supabase, user.id);
+
+  const { data, error } = await applyOwnershipFilter(
+    supabase.from("recipe_history").select("*").eq("recipe_id", recipeId),
+    ctx
+  ).order("made_date", { ascending: false });
 
   if (error) {
     return { data: null, error: error.message };

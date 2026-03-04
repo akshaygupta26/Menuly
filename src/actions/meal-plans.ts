@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getHouseholdContext, applyOwnershipFilter } from "@/lib/household-context";
 import type {
   MealPlan,
   MealPlanItem,
@@ -22,7 +23,7 @@ interface MealPlanWithItems extends MealPlan {
 }
 
 interface MealPlanItemWithOwner {
-  meal_plan: { user_id: string } | null;
+  meal_plan: { user_id: string; household_id: string | null } | null;
 }
 
 interface PickerRecipe {
@@ -70,13 +71,13 @@ export async function getMealPlan(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Try to find an existing meal plan for this week
-  const { data: existingPlan, error: fetchError } = await supabase
-    .from("meal_plans")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("week_start", weekStart)
-    .single();
+  const { data: existingPlan, error: fetchError } = await applyOwnershipFilter(
+    supabase.from("meal_plans").select("*").eq("week_start", weekStart),
+    ctx
+  ).single();
 
   if (fetchError && fetchError.code !== "PGRST116") {
     // PGRST116 = "no rows returned" — that's OK, we'll create one
@@ -91,6 +92,7 @@ export async function getMealPlan(
       .from("meal_plans")
       .insert({
         user_id: user.id,
+        household_id: ctx.householdId,
         week_start: weekStart,
         status: "draft",
       })
@@ -145,13 +147,13 @@ export async function addMealPlanItem(
     return { data: null, error: "Not authenticated" };
   }
 
-  // Verify the meal plan belongs to this user
-  const { data: plan, error: planError } = await supabase
-    .from("meal_plans")
-    .select("id")
-    .eq("id", mealPlanId)
-    .eq("user_id", user.id)
-    .single();
+  const ctx = await getHouseholdContext(supabase, user.id);
+
+  // Verify the meal plan belongs to this user/household
+  const { data: plan, error: planError } = await applyOwnershipFilter(
+    supabase.from("meal_plans").select("id").eq("id", mealPlanId),
+    ctx
+  ).single();
 
   if (planError || !plan) {
     return { data: null, error: "Meal plan not found" };
@@ -195,10 +197,12 @@ export async function updateMealPlanItem(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Verify ownership via the meal plan
   const { data: existing, error: fetchError } = await supabase
     .from("meal_plan_items")
-    .select("*, meal_plan:meal_plans!inner(user_id)")
+    .select("*, meal_plan:meal_plans!inner(user_id, household_id)")
     .eq("id", itemId)
     .single();
 
@@ -206,7 +210,12 @@ export async function updateMealPlanItem(
     return { data: null, error: "Meal plan item not found" };
   }
 
-  if ((existing as unknown as MealPlanItemWithOwner).meal_plan?.user_id !== user.id) {
+  const owner = (existing as unknown as MealPlanItemWithOwner).meal_plan;
+  const isOwner = ctx.householdId
+    ? owner?.household_id === ctx.householdId
+    : owner?.user_id === user.id;
+
+  if (!isOwner) {
     return { data: null, error: "Meal plan item not found" };
   }
 
@@ -251,10 +260,12 @@ export async function removeMealPlanItem(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Verify ownership via the meal plan
   const { data: existing, error: fetchError } = await supabase
     .from("meal_plan_items")
-    .select("*, meal_plan:meal_plans!inner(user_id)")
+    .select("*, meal_plan:meal_plans!inner(user_id, household_id)")
     .eq("id", itemId)
     .single();
 
@@ -262,7 +273,12 @@ export async function removeMealPlanItem(
     return { data: null, error: "Meal plan item not found" };
   }
 
-  if ((existing as unknown as MealPlanItemWithOwner).meal_plan?.user_id !== user.id) {
+  const owner = (existing as unknown as MealPlanItemWithOwner).meal_plan;
+  const isOwner = ctx.householdId
+    ? owner?.household_id === ctx.householdId
+    : owner?.user_id === user.id;
+
+  if (!isOwner) {
     return { data: null, error: "Meal plan item not found" };
   }
 
@@ -297,13 +313,13 @@ export async function finalizeMealPlan(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Verify ownership and current status
-  const { data: plan, error: planError } = await supabase
-    .from("meal_plans")
-    .select("*")
-    .eq("id", mealPlanId)
-    .eq("user_id", user.id)
-    .single();
+  const { data: plan, error: planError } = await applyOwnershipFilter(
+    supabase.from("meal_plans").select("*").eq("id", mealPlanId),
+    ctx
+  ).single();
 
   if (planError || !plan) {
     return { data: null, error: "Meal plan not found" };
@@ -332,6 +348,7 @@ export async function finalizeMealPlan(
     const historyRows = recipeIds.map((recipeId) => ({
       recipe_id: recipeId,
       user_id: user.id,
+      household_id: ctx.householdId,
       made_date: plan.week_start,
     }));
 
@@ -345,11 +362,10 @@ export async function finalizeMealPlan(
   }
 
   // Update the meal plan status
-  const { error: updateError } = await supabase
-    .from("meal_plans")
-    .update({ status: "finalized" })
-    .eq("id", mealPlanId)
-    .eq("user_id", user.id);
+  const { error: updateError } = await applyOwnershipFilter(
+    supabase.from("meal_plans").update({ status: "finalized" }).eq("id", mealPlanId),
+    ctx
+  );
 
   if (updateError) {
     return { data: null, error: updateError.message };
@@ -377,12 +393,12 @@ export async function unfinalizeMealPlan(
     return { data: null, error: "Not authenticated" };
   }
 
-  const { data: plan, error: planError } = await supabase
-    .from("meal_plans")
-    .select("id, status")
-    .eq("id", mealPlanId)
-    .eq("user_id", user.id)
-    .single();
+  const ctx = await getHouseholdContext(supabase, user.id);
+
+  const { data: plan, error: planError } = await applyOwnershipFilter(
+    supabase.from("meal_plans").select("id, status").eq("id", mealPlanId),
+    ctx
+  ).single();
 
   if (planError || !plan) {
     return { data: null, error: "Meal plan not found" };
@@ -392,11 +408,10 @@ export async function unfinalizeMealPlan(
     return { data: null, error: "Meal plan is already a draft" };
   }
 
-  const { error: updateError } = await supabase
-    .from("meal_plans")
-    .update({ status: "draft" })
-    .eq("id", mealPlanId)
-    .eq("user_id", user.id);
+  const { error: updateError } = await applyOwnershipFilter(
+    supabase.from("meal_plans").update({ status: "draft" }).eq("id", mealPlanId),
+    ctx
+  );
 
   if (updateError) {
     return { data: null, error: updateError.message };
@@ -422,13 +437,13 @@ export async function clearAllMealPlanItems(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Verify ownership
-  const { data: plan, error: planError } = await supabase
-    .from("meal_plans")
-    .select("id, status")
-    .eq("id", mealPlanId)
-    .eq("user_id", user.id)
-    .single();
+  const { data: plan, error: planError } = await applyOwnershipFilter(
+    supabase.from("meal_plans").select("id, status").eq("id", mealPlanId),
+    ctx
+  ).single();
 
   if (planError || !plan) {
     return { data: null, error: "Meal plan not found" };
@@ -468,13 +483,13 @@ export async function clearMealPlanSlot(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Verify ownership
-  const { data: plan, error: planError } = await supabase
-    .from("meal_plans")
-    .select("id, status")
-    .eq("id", mealPlanId)
-    .eq("user_id", user.id)
-    .single();
+  const { data: plan, error: planError } = await applyOwnershipFilter(
+    supabase.from("meal_plans").select("id, status").eq("id", mealPlanId),
+    ctx
+  ).single();
 
   if (planError || !plan) {
     return { data: null, error: "Meal plan not found" };
@@ -516,13 +531,16 @@ export async function getRecipesForPicker(
     return { data: null, error: "Not authenticated" };
   }
 
-  let query = supabase
-    .from("recipes")
-    .select(
-      "id, name, cuisine_type, protein_type, meal_type, is_favorite, last_made_date, times_made"
-    )
-    .eq("user_id", user.id)
-    .order("name");
+  const ctx = await getHouseholdContext(supabase, user.id);
+
+  let query = applyOwnershipFilter(
+    supabase
+      .from("recipes")
+      .select(
+        "id, name, cuisine_type, protein_type, meal_type, is_favorite, last_made_date, times_made"
+      ),
+    ctx
+  ).order("name");
 
   if (search) {
     query = query.ilike("name", `%${search}%`);

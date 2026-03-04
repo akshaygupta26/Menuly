@@ -1,4 +1,32 @@
 export type NutritionSource = "json_ld" | "usda" | "manual";
+export type HouseholdRole = "owner" | "member";
+
+export interface Household {
+  id: string;
+  name: string;
+  invite_code: string;
+  owner_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HouseholdMember {
+  id: string;
+  household_id: string;
+  user_id: string;
+  joined_at: string;
+}
+
+export interface HouseholdMemberInfo {
+  user_id: string;
+  email: string | null;
+  joined_at: string;
+  role: HouseholdRole;
+}
+
+export interface HouseholdWithMembers extends Household {
+  members: HouseholdMemberInfo[];
+}
 
 export interface NutritionInfo {
   calories: number | null;
@@ -28,6 +56,7 @@ export type IngredientCategory =
 export interface Profile {
   id: string;
   user_id: string;
+  email: string | null;
   meal_slots: MealType[];
   ai_generation_count: number;
   ai_generation_reset_at: string;
@@ -39,6 +68,7 @@ export interface Profile {
 export interface Recipe {
   id: string;
   user_id: string;
+  household_id: string | null;
   name: string;
   cuisine_type: string | null;
   protein_type: string | null;
@@ -80,6 +110,7 @@ export interface RecipeHistory {
   id: string;
   recipe_id: string;
   user_id: string;
+  household_id: string | null;
   made_date: string;
   rating: number | null;
   notes: string | null;
@@ -89,6 +120,7 @@ export interface RecipeHistory {
 export interface MealPlan {
   id: string;
   user_id: string;
+  household_id: string | null;
   week_start: string;
   status: MealPlanStatus;
   created_at: string;
@@ -112,6 +144,7 @@ export interface MealPlanItemWithRecipe extends MealPlanItem {
 export interface GroceryList {
   id: string;
   user_id: string;
+  household_id: string | null;
   meal_plan_id: string | null;
   name: string;
   is_active: boolean;

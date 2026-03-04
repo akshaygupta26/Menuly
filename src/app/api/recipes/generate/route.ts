@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
+import { getHouseholdContext, applyOwnershipFilter } from "@/lib/household-context";
 import {
   buildRecipePrompt,
   type UserPreferences,
@@ -169,13 +170,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch user's existing recipes for preference learning
-    const { data: recipes } = await supabase
-      .from("recipes")
-      .select(
-        "name, cuisine_type, protein_type, meal_type, tags"
-      )
-      .eq("user_id", user.id);
+    const ctx = await getHouseholdContext(supabase, user.id);
+
+    // Fetch user/household recipes for preference learning
+    const { data: recipes } = await applyOwnershipFilter(
+      supabase
+        .from("recipes")
+        .select("name, cuisine_type, protein_type, meal_type, tags"),
+      ctx
+    );
 
     const userPreferences = analyzePreferences((recipes as Recipe[]) ?? []);
 

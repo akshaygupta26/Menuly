@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -46,17 +47,36 @@ function groupIngredientsByCategory(ingredients: RecipeIngredient[]) {
   return grouped;
 }
 
+const COMMON_FRACTIONS: [number, string][] = [
+  [0.125, "1/8"],
+  [0.25, "1/4"],
+  [1 / 3, "1/3"],
+  [0.375, "3/8"],
+  [0.5, "1/2"],
+  [2 / 3, "2/3"],
+  [0.75, "3/4"],
+  [0.875, "7/8"],
+];
+
+function formatQuantity(qty: number): string {
+  const whole = Math.floor(qty);
+  const frac = qty - whole;
+
+  if (frac < 0.01) return String(whole);
+
+  const match = COMMON_FRACTIONS.find(([val]) => Math.abs(frac - val) < 0.02);
+  if (match) {
+    return whole > 0 ? `${whole} ${match[1]}` : match[1];
+  }
+
+  return qty.toFixed(2).replace(/\.?0+$/, "");
+}
+
 function formatIngredient(ing: RecipeIngredient): string {
   const parts: string[] = [];
 
   if (ing.quantity != null) {
-    // Display fractions nicely
-    const qty = ing.quantity;
-    if (qty === Math.floor(qty)) {
-      parts.push(String(qty));
-    } else {
-      parts.push(qty.toFixed(2).replace(/\.?0+$/, ""));
-    }
+    parts.push(formatQuantity(ing.quantity));
   }
 
   if (ing.unit) parts.push(ing.unit);
@@ -103,6 +123,20 @@ export default async function RecipeDetailPage({
       </Header>
 
       <div className="space-y-8">
+        {/* Hero image */}
+        {recipe.image_url && (
+          <div className="relative aspect-[2/1] w-full overflow-hidden rounded-lg bg-muted">
+            <Image
+              src={recipe.image_url}
+              alt={recipe.name}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 720px"
+              priority
+            />
+          </div>
+        )}
+
         {/* Metadata badges */}
         <div className="flex flex-wrap items-center gap-2">
           {recipe.cuisine_type && (

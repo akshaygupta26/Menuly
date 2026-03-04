@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { applyOwnershipFilter } from "@/lib/household-context";
 import type { GroceryList, GroceryItem } from "@/types/database";
 
 // ---------------------------------------------------------------------------
@@ -59,13 +60,23 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // ---- Fetch active grocery list -------------------------------------------
-  const { data: list, error: listError } = await supabase
-    .from("grocery_lists")
-    .select("*")
+  // ---- Determine household context ------------------------------------------
+  const { data: membership } = await supabase
+    .from("household_members")
+    .select("household_id")
     .eq("user_id", user.id)
-    .eq("is_active", true)
     .maybeSingle();
+
+  const ctx = {
+    userId: user.id,
+    householdId: membership?.household_id ?? null,
+  };
+
+  // ---- Fetch active grocery list -------------------------------------------
+  const { data: list, error: listError } = await applyOwnershipFilter(
+    supabase.from("grocery_lists").select("*").eq("is_active", true),
+    ctx
+  ).maybeSingle();
 
   if (listError) {
     return NextResponse.json(

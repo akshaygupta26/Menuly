@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getHouseholdContext, applyOwnershipFilter } from "@/lib/household-context";
 import { generateMealPlan } from "@/lib/rotation-algorithm";
 import type { Recipe, MealPlanItem, MealType } from "@/types/database";
 
@@ -33,13 +34,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify the meal plan belongs to this user
-    const { data: mealPlan, error: planError } = await supabase
-      .from("meal_plans")
-      .select("*")
-      .eq("id", mealPlanId)
-      .eq("user_id", user.id)
-      .single();
+    const ctx = await getHouseholdContext(supabase, user.id);
+
+    // Verify the meal plan belongs to this user/household
+    const { data: mealPlan, error: planError } = await applyOwnershipFilter(
+      supabase.from("meal_plans").select("*").eq("id", mealPlanId),
+      ctx
+    ).single();
 
     if (planError || !mealPlan) {
       return NextResponse.json(
@@ -68,11 +69,11 @@ export async function POST(request: Request) {
       "dinner",
     ];
 
-    // Fetch all user recipes
-    const { data: recipes, error: recipesError } = await supabase
-      .from("recipes")
-      .select("*")
-      .eq("user_id", user.id);
+    // Fetch all user/household recipes
+    const { data: recipes, error: recipesError } = await applyOwnershipFilter(
+      supabase.from("recipes").select("*"),
+      ctx
+    );
 
     if (recipesError) {
       return NextResponse.json(

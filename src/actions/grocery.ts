@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getHouseholdContext, applyOwnershipFilter } from "@/lib/household-context";
 import type {
   GroceryList,
   GroceryItem,
@@ -51,12 +52,12 @@ export async function getActiveGroceryList(): Promise<
     return { data: null, error: "Not authenticated" };
   }
 
-  const { data: list, error: listError } = await supabase
-    .from("grocery_lists")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
+  const ctx = await getHouseholdContext(supabase, user.id);
+
+  const { data: list, error: listError } = await applyOwnershipFilter(
+    supabase.from("grocery_lists").select("*").eq("is_active", true),
+    ctx
+  ).maybeSingle();
 
   if (listError) {
     return { data: null, error: listError.message };
@@ -98,13 +99,13 @@ export async function generateGroceryList(
     return { data: null, error: "Not authenticated" };
   }
 
-  // Verify the meal plan belongs to the user and is finalized
-  const { data: mealPlan, error: planError } = await supabase
-    .from("meal_plans")
-    .select("id, status, week_start")
-    .eq("id", mealPlanId)
-    .eq("user_id", user.id)
-    .single();
+  const ctx = await getHouseholdContext(supabase, user.id);
+
+  // Verify the meal plan belongs to the user/household and is finalized
+  const { data: mealPlan, error: planError } = await applyOwnershipFilter(
+    supabase.from("meal_plans").select("id, status, week_start").eq("id", mealPlanId),
+    ctx
+  ).single();
 
   if (planError || !mealPlan) {
     return { data: null, error: "Meal plan not found" };
@@ -160,17 +161,17 @@ export async function generateGroceryList(
   const grouped = consolidateIngredients(inputs);
 
   // Deactivate any existing active grocery lists
-  await supabase
-    .from("grocery_lists")
-    .update({ is_active: false })
-    .eq("user_id", user.id)
-    .eq("is_active", true);
+  await applyOwnershipFilter(
+    supabase.from("grocery_lists").update({ is_active: false }).eq("is_active", true),
+    ctx
+  );
 
   // Create the new grocery list
   const { data: newList, error: createError } = await supabase
     .from("grocery_lists")
     .insert({
       user_id: user.id,
+      household_id: ctx.householdId,
       meal_plan_id: mealPlanId,
       name: `Grocery List - Week of ${mealPlan.week_start}`,
       is_active: true,
@@ -227,6 +228,8 @@ export async function toggleGroceryItem(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Get current value (verify ownership via join)
   const { data: item, error: fetchError } = await supabase
     .from("grocery_items")
@@ -239,12 +242,10 @@ export async function toggleGroceryItem(
   }
 
   // Verify list ownership
-  const { data: list, error: listError } = await supabase
-    .from("grocery_lists")
-    .select("id")
-    .eq("id", item.grocery_list_id)
-    .eq("user_id", user.id)
-    .single();
+  const { data: list, error: listError } = await applyOwnershipFilter(
+    supabase.from("grocery_lists").select("id").eq("id", item.grocery_list_id),
+    ctx
+  ).single();
 
   if (listError || !list) {
     return { data: null, error: "Not authorized" };
@@ -278,13 +279,13 @@ export async function addManualItem(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Verify list ownership
-  const { data: list, error: listError } = await supabase
-    .from("grocery_lists")
-    .select("id")
-    .eq("id", listId)
-    .eq("user_id", user.id)
-    .single();
+  const { data: list, error: listError } = await applyOwnershipFilter(
+    supabase.from("grocery_lists").select("id").eq("id", listId),
+    ctx
+  ).single();
 
   if (listError || !list) {
     return { data: null, error: "List not found" };
@@ -338,6 +339,8 @@ export async function removeGroceryItem(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Get the item to verify ownership
   const { data: item, error: fetchError } = await supabase
     .from("grocery_items")
@@ -350,12 +353,10 @@ export async function removeGroceryItem(
   }
 
   // Verify list ownership
-  const { data: list, error: listError } = await supabase
-    .from("grocery_lists")
-    .select("id")
-    .eq("id", item.grocery_list_id)
-    .eq("user_id", user.id)
-    .single();
+  const { data: list, error: listError } = await applyOwnershipFilter(
+    supabase.from("grocery_lists").select("id").eq("id", item.grocery_list_id),
+    ctx
+  ).single();
 
   if (listError || !list) {
     return { data: null, error: "Not authorized" };
@@ -387,12 +388,12 @@ export async function getGroceryList(
     return { data: null, error: "Not authenticated" };
   }
 
-  const { data: list, error: listError } = await supabase
-    .from("grocery_lists")
-    .select("*")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .single();
+  const ctx = await getHouseholdContext(supabase, user.id);
+
+  const { data: list, error: listError } = await applyOwnershipFilter(
+    supabase.from("grocery_lists").select("*").eq("id", id),
+    ctx
+  ).single();
 
   if (listError || !list) {
     return { data: null, error: "List not found" };
@@ -430,13 +431,13 @@ export async function clearGroceryList(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Verify list ownership
-  const { data: list, error: listError } = await supabase
-    .from("grocery_lists")
-    .select("id")
-    .eq("id", listId)
-    .eq("user_id", user.id)
-    .single();
+  const { data: list, error: listError } = await applyOwnershipFilter(
+    supabase.from("grocery_lists").select("id").eq("id", listId),
+    ctx
+  ).single();
 
   if (listError || !list) {
     return { data: null, error: "List not found" };
@@ -468,13 +469,13 @@ export async function clearCheckedItems(
     return { data: null, error: "Not authenticated" };
   }
 
+  const ctx = await getHouseholdContext(supabase, user.id);
+
   // Verify list ownership
-  const { data: list, error: listError } = await supabase
-    .from("grocery_lists")
-    .select("id")
-    .eq("id", listId)
-    .eq("user_id", user.id)
-    .single();
+  const { data: list, error: listError } = await applyOwnershipFilter(
+    supabase.from("grocery_lists").select("id").eq("id", listId),
+    ctx
+  ).single();
 
   if (listError || !list) {
     return { data: null, error: "List not found" };

@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { Star, Clock, Users, CalendarDays, Flame } from "lucide-react";
+import { Star, Clock, Users, CalendarDays, Flame, ImageIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 import type { Recipe } from "@/types/database";
@@ -26,8 +27,25 @@ export function RecipeCard({ recipe, onToggleFavorite }: RecipeCardProps) {
     (recipe.prep_time ?? 0) + (recipe.cook_time ?? 0) || null;
 
   return (
-    <Card className="group relative gap-4 py-4 transition-shadow hover:shadow-md">
-      <CardHeader className="gap-1.5">
+    <Card className="group relative gap-0 overflow-hidden py-0 transition-shadow hover:shadow-md">
+      {/* Recipe image */}
+      <div className="relative aspect-[16/9] w-full bg-muted">
+        {recipe.image_url ? (
+          <Image
+            src={recipe.image_url}
+            alt={recipe.name}
+            fill
+            className="object-cover"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <ImageIcon className="size-8 text-muted-foreground/40" />
+          </div>
+        )}
+      </div>
+
+      <CardHeader className="gap-1.5 px-4 pt-3 pb-0">
         <CardTitle className="line-clamp-1">
           <Link
             href={`/recipes/${recipe.id}`}
@@ -79,7 +97,7 @@ export function RecipeCard({ recipe, onToggleFavorite }: RecipeCardProps) {
         </div>
       </CardHeader>
 
-      <CardFooter className="flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-xs">
+      <CardFooter className="flex-wrap gap-x-4 gap-y-1 px-4 pb-4 text-muted-foreground text-xs">
         {totalTime !== null && (
           <span className="inline-flex items-center gap-1">
             <Clock className="size-3.5" />
