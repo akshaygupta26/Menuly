@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -23,6 +23,24 @@ export default function NewRecipePage() {
   const [generatedDefaults, setGeneratedDefaults] =
     useState<Partial<RecipeFormValues> | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
+
+  // Pick up AI-generated recipe data passed via sessionStorage (from the
+  // "Create with AI" sheet on the recipes list page).
+  useEffect(() => {
+    const stored = sessionStorage.getItem("ai-generated-recipe");
+    if (stored) {
+      sessionStorage.removeItem("ai-generated-recipe");
+      try {
+        const data = JSON.parse(stored) as Partial<RecipeFormValues>;
+        setGeneratedDefaults(data);
+        setTimeout(() => {
+          formRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } catch {
+        // ignore malformed data
+      }
+    }
+  }, []);
 
   const handleGenerated = useCallback((data: Partial<RecipeFormValues>) => {
     setGeneratedDefaults(data);
