@@ -5,6 +5,7 @@ import type {
   MealType,
   NutritionSource,
 } from "@/types/database";
+import { getHouseholdContext } from "@/lib/household-context";
 
 // ---------------------------------------------------------------------------
 // POST /api/recipes/webhook
@@ -167,13 +168,8 @@ export async function POST(request: Request) {
   }
 
   // ---- Household context ---------------------------------------------------
-  const { data: membership } = await supabase
-    .from("household_members")
-    .select("household_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const householdId = membership?.household_id ?? null;
+  const ctx = await getHouseholdContext(supabase, user.id);
+  const householdId = ctx.householdId;
 
   // ---- Parse body ----------------------------------------------------------
   let body: Record<string, unknown>;
