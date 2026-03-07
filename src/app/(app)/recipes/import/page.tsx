@@ -151,8 +151,10 @@ export default function ImportRecipePage() {
 
       toast.success("Recipe saved!");
       router.push(`/recipes/${data!.id}`);
-    } catch {
-      toast.error("Something went wrong. Please try again.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to save imported recipe. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }

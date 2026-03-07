@@ -98,8 +98,10 @@ export function EditRecipeClient({
 
       toast.success("Recipe updated!");
       router.push(`/recipes/${recipeId}`);
-    } catch {
-      toast.error("Something went wrong. Please try again.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update recipe. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }

@@ -34,14 +34,14 @@ export function RecipesHeaderActions() {
       <Button asChild variant="outline" size="sm">
         <Link href="/recipes/import">
           <LinkIcon className="size-4" />
-          Import URL
+          <span className="hidden sm:inline">Import URL</span>
         </Link>
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <Button variant="outline" size="sm">
             <Sparkles className="size-4" />
-            Create with AI
+            <span className="hidden sm:inline">Create with AI</span>
           </Button>
         </SheetTrigger>
         <SheetContent className="sm:max-w-lg overflow-y-auto">
@@ -60,7 +60,7 @@ export function RecipesHeaderActions() {
       <Button asChild size="sm">
         <Link href="/recipes/new">
           <Plus className="size-4" />
-          Add Recipe
+          <span className="hidden sm:inline">Add Recipe</span>
         </Link>
       </Button>
     </div>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { Search, UtensilsCrossed, Pen } from "lucide-react";
+import { useCallback, useMemo, useState, useTransition } from "react";
+import { Search, UtensilsCrossed, Pen, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
 import type { MealType } from "@/types/database";
 import { getRecipesForPicker } from "@/actions/meal-plans";
@@ -62,18 +63,23 @@ export function RecipePickerDialog({
   const [isCustom, setIsCustom] = useState(false);
   const [customName, setCustomName] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [fetchError, setFetchError] = useState(false);
 
   // Fetch ALL recipes when dialog opens (no server-side meal type filter)
   const fetchRecipes = useCallback(() => {
+    setFetchError(false);
     startTransition(async () => {
       const { data, error } = await getRecipesForPicker();
-      if (!error && data) {
+      if (error || !data) {
+        setFetchError(true);
+        toast.error("Failed to load recipes");
+      } else {
         setRecipes(data);
       }
     });
   }, []);
 
-  // Reset state when dialog opens (adjusting state during render pattern)
+  // Reset state and fetch when dialog opens (adjusting state during render pattern)
   const [prevOpen, setPrevOpen] = useState(open);
   if (open && !prevOpen) {
     setPrevOpen(true);
@@ -81,15 +87,12 @@ export function RecipePickerDialog({
     setMealTypeFilter(null);
     setIsCustom(false);
     setCustomName("");
+    setFetchError(false);
+    // Schedule fetch after render commit
+    queueMicrotask(() => fetchRecipes());
   } else if (!open && prevOpen) {
     setPrevOpen(false);
   }
-
-  useEffect(() => {
-    if (open) {
-      fetchRecipes();
-    }
-  }, [open, fetchRecipes]);
 
   // Filter recipes by search term + optional meal type
   const filtered = useMemo(() => {
@@ -202,7 +205,15 @@ export function RecipePickerDialog({
 
             {/* Recipe list */}
             <ScrollArea className="h-[300px]">
-              {isPending ? (
+              {fetchError ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-12 text-sm text-muted-foreground">
+                  <AlertCircle className="size-8 text-destructive opacity-60" />
+                  <span>Could not load recipes.</span>
+                  <Button variant="outline" size="sm" onClick={fetchRecipes}>
+                    Retry
+                  </Button>
+                </div>
+              ) : isPending ? (
                 <div className="space-y-2 py-2">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="flex items-center gap-3 rounded-md px-3 py-2">

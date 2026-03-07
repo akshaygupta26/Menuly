@@ -6,7 +6,7 @@ interface HeaderProps {
 
 export function Header({ title, subtitle, children }: HeaderProps) {
   return (
-    <div className="flex items-start justify-between gap-4 mb-6">
+    <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-start sm:justify-between sm:gap-4">
       <div className="min-w-0">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
           {title}
@@ -15,7 +15,7 @@ export function Header({ title, subtitle, children }: HeaderProps) {
           <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
         )}
       </div>
-      {children && <div className="flex shrink-0 items-center gap-2">{children}</div>}
+      {children && <div className="flex shrink-0 flex-wrap items-center gap-2">{children}</div>}
     </div>
   );
 }

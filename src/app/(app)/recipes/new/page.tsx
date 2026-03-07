@@ -121,8 +121,10 @@ export default function NewRecipePage() {
 
       toast.success("Recipe created!");
       router.push(`/recipes/${data!.id}`);
-    } catch {
-      toast.error("Something went wrong. Please try again.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create recipe. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Star, Clock, Users, CalendarDays, Flame, ImageIcon } from "lucide-react";
+import { Star, Clock, Users, CalendarDays, Flame } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 import type { Recipe } from "@/types/database";
@@ -28,9 +28,9 @@ export function RecipeCard({ recipe, onToggleFavorite }: RecipeCardProps) {
 
   return (
     <Card className="group relative gap-0 overflow-hidden py-0 transition-shadow hover:shadow-md">
-      {/* Recipe image */}
-      <div className="relative aspect-[16/9] w-full bg-muted">
-        {recipe.image_url ? (
+      {/* Recipe image — only shown when an image exists */}
+      {recipe.image_url && (
+        <div className="relative aspect-[16/9] w-full bg-muted">
           <Image
             src={recipe.image_url}
             alt={recipe.name}
@@ -38,15 +38,11 @@ export function RecipeCard({ recipe, onToggleFavorite }: RecipeCardProps) {
             className="object-cover"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <ImageIcon className="size-8 text-muted-foreground/40" />
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <CardHeader className="gap-1.5 px-4 pt-3 pb-0">
-        <CardTitle className="line-clamp-1">
+      <CardHeader className={cn("gap-1.5 px-4 pb-0", recipe.image_url ? "pt-3" : "pt-4")}>
+        <CardTitle className="line-clamp-2">
           <Link
             href={`/recipes/${recipe.id}`}
             className="after:absolute after:inset-0"
@@ -83,10 +79,10 @@ export function RecipeCard({ recipe, onToggleFavorite }: RecipeCardProps) {
         </CardAction>
 
         <div className="flex flex-wrap gap-1.5">
-          {recipe.cuisine_type && (
+          {recipe.cuisine_type && recipe.cuisine_type !== "other" && (
             <Badge variant="secondary">{recipe.cuisine_type}</Badge>
           )}
-          {recipe.protein_type && (
+          {recipe.protein_type && recipe.protein_type !== "other" && (
             <Badge variant="outline">{recipe.protein_type}</Badge>
           )}
           {recipe.meal_type.map((meal) => (
