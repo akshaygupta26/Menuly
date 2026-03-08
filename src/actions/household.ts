@@ -145,16 +145,14 @@ export async function createHousehold(
   }
 
   // Generate unique invite code with collision retry
+  // Uses RPC to bypass RLS (can't see other users' households)
   let inviteCode = generateInviteCode();
   let attempts = 0;
   while (attempts < 10) {
     const { data: existing } = await supabase
-      .from("households")
-      .select("id")
-      .eq("invite_code", inviteCode)
-      .maybeSingle();
+      .rpc("lookup_household_by_invite_code", { code: inviteCode });
 
-    if (!existing) break;
+    if (!existing || (Array.isArray(existing) && existing.length === 0)) break;
     inviteCode = generateInviteCode();
     attempts++;
   }
@@ -249,12 +247,12 @@ export async function joinHousehold(
     return { data: null, error: "You are already in a household. Leave it first to join another." };
   }
 
-  // Find household by code
-  const { data: household, error: findError } = await supabase
-    .from("households")
-    .select("*")
-    .eq("invite_code", code)
-    .maybeSingle();
+  // Find household by code (uses SECURITY DEFINER function to bypass RLS,
+  // since the joining user isn't a member yet and can't see the household)
+  const { data: households, error: findError } = await supabase
+    .rpc("lookup_household_by_invite_code", { code });
+
+  const household = Array.isArray(households) ? households[0] : null;
 
   if (findError || !household) {
     return { data: null, error: "Invalid invite code" };
@@ -430,17 +428,14 @@ export async function regenerateInviteCode(): Promise<ActionResult<{ invite_code
     return { data: null, error: "You are not the household owner" };
   }
 
-  // Generate unique code
+  // Generate unique code (uses RPC to bypass RLS)
   let inviteCode = generateInviteCode();
   let attempts = 0;
   while (attempts < 10) {
     const { data: existing } = await supabase
-      .from("households")
-      .select("id")
-      .eq("invite_code", inviteCode)
-      .maybeSingle();
+      .rpc("lookup_household_by_invite_code", { code: inviteCode });
 
-    if (!existing) break;
+    if (!existing || (Array.isArray(existing) && existing.length === 0)) break;
     inviteCode = generateInviteCode();
     attempts++;
   }
