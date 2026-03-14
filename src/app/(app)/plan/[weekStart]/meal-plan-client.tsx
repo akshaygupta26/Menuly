@@ -21,6 +21,7 @@ import {
 import { generateGroceryList } from "@/actions/grocery";
 import { WeekGrid } from "@/components/meal-plan/week-grid";
 import { RecipePickerDialog } from "@/components/meal-plan/recipe-picker-dialog";
+import { SuggestionSheet } from "@/components/meal-plan/suggestion-sheet";
 import {
   Dialog,
   DialogContent,
@@ -115,6 +116,12 @@ export function MealPlanClient({
     mealSlot: "dinner",
   });
 
+  const [suggestionState, setSuggestionState] = useState<PickerState>({
+    open: false,
+    dayOfWeek: 1,
+    mealSlot: "dinner",
+  });
+
   // ---- Handlers -----------------------------------------------------------
 
   function handleOpenPicker(dayOfWeek: number, mealSlot: MealType) {
@@ -123,6 +130,18 @@ export function MealPlanClient({
 
   function handleClosePicker() {
     setPicker((prev) => ({ ...prev, open: false }));
+  }
+
+  function handleOpenSuggestion(dayOfWeek: number, mealSlot: MealType) {
+    setSuggestionState({ open: true, dayOfWeek, mealSlot });
+  }
+
+  function handleCloseSuggestion() {
+    setSuggestionState((prev) => ({ ...prev, open: false }));
+  }
+
+  function handleSuggestionAccepted() {
+    router.refresh();
   }
 
   function handleSelectRecipe(recipeId: string | null, recipeName: string) {
@@ -277,6 +296,7 @@ export function MealPlanClient({
         mealPlan={mealPlan}
         mealSlots={mealSlots}
         onAddItem={handleOpenPicker}
+        onSuggestItem={mealPlan ? handleOpenSuggestion : undefined}
         onRemoveItem={handleRemoveItem}
         onClearAll={handleClearAll}
         onClearSlot={handleClearSlot}
@@ -293,6 +313,17 @@ export function MealPlanClient({
         onSelect={handleSelectRecipe}
         mealSlot={picker.mealSlot}
       />
+
+      {mealPlan && (
+        <SuggestionSheet
+          open={suggestionState.open}
+          onClose={handleCloseSuggestion}
+          mealSlot={suggestionState.mealSlot}
+          dayOfWeek={suggestionState.dayOfWeek}
+          mealPlanId={mealPlan.id}
+          onAccepted={handleSuggestionAccepted}
+        />
+      )}
 
       <Dialog open={showFinalizeConfirm} onOpenChange={setShowFinalizeConfirm}>
         <DialogContent>

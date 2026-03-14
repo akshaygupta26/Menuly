@@ -152,6 +152,25 @@ export interface GroceryList {
   updated_at: string;
 }
 
+export interface SuggestedRecipe {
+  name: string;
+  cuisine_type: string;
+  protein_type: string;
+  meal_type: MealType[];
+  estimated_prep_minutes: number;
+  estimated_cook_minutes: number;
+  servings: number;
+  why: string;
+  ingredients: string[];
+  instructions: string[];
+  estimated_nutrition: {
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+  };
+}
+
 export interface GroceryItem {
   id: string;
   grocery_list_id: string;

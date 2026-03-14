@@ -28,6 +28,7 @@ interface WeekGridProps {
   mealPlan: MealPlanWithItems | null;
   mealSlots: MealType[];
   onAddItem: (dayOfWeek: number, mealSlot: MealType) => void;
+  onSuggestItem?: (dayOfWeek: number, mealSlot: MealType) => void;
   onRemoveItem: (itemId: string) => void;
   onClearAll: () => void;
   onClearSlot: (slot: MealType) => void;
@@ -150,6 +151,7 @@ function MealSlotCell({
   dayOfWeek,
   isFinalized,
   onAdd,
+  onSuggest,
   onRemove,
 }: {
   item: MealPlanItemWithRecipe | undefined;
@@ -157,6 +159,7 @@ function MealSlotCell({
   dayOfWeek: number;
   isFinalized: boolean;
   onAdd: () => void;
+  onSuggest?: () => void;
   onRemove: (id: string) => void;
 }) {
   if (item) {
@@ -195,19 +198,33 @@ function MealSlotCell({
   }
 
   return (
-    <button
-      type="button"
-      onClick={onAdd}
-      disabled={isFinalized}
-      className={cn(
-        "flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground transition-colors",
-        !isFinalized && "hover:border-primary/50 hover:text-primary hover:bg-primary/5"
-      )}
+    <div
+      className="flex w-full gap-1"
       data-droppable={`${dayOfWeek}-${mealSlot}`}
     >
-      <Plus className="size-3" />
-      <span className="sr-only sm:not-sr-only">Add</span>
-    </button>
+      <button
+        type="button"
+        onClick={onAdd}
+        disabled={isFinalized}
+        className={cn(
+          "flex flex-1 items-center justify-center gap-1 rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground transition-colors",
+          !isFinalized && "hover:border-primary/50 hover:text-primary hover:bg-primary/5"
+        )}
+      >
+        <Plus className="size-3" />
+        <span className="sr-only sm:not-sr-only">Add</span>
+      </button>
+      {onSuggest && !isFinalized && (
+        <button
+          type="button"
+          onClick={onSuggest}
+          className="flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary hover:bg-primary/5"
+          title="AI Suggest"
+        >
+          <Sparkles className="size-3" />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -220,6 +237,7 @@ export function WeekGrid({
   mealPlan,
   mealSlots,
   onAddItem,
+  onSuggestItem,
   onRemoveItem,
   onClearAll,
   onClearSlot,
@@ -399,6 +417,7 @@ export function WeekGrid({
                     dayOfWeek={dayOfWeek}
                     isFinalized={isFinalized}
                     onAdd={() => onAddItem(dayOfWeek, slot)}
+                    onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
                     onRemove={onRemoveItem}
                   />
                 </div>
@@ -463,6 +482,7 @@ export function WeekGrid({
                         dayOfWeek={dayOfWeek}
                         isFinalized={isFinalized}
                         onAdd={() => onAddItem(dayOfWeek, slot)}
+                        onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
                         onRemove={onRemoveItem}
                       />
                     </div>
