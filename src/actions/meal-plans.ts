@@ -515,7 +515,85 @@ export async function clearMealPlanSlot(
 }
 
 // ---------------------------------------------------------------------------
-// 9. getRecipesForPicker
+// 9. moveMealPlanItem (for drag-and-drop)
+// ---------------------------------------------------------------------------
+
+/**
+ * Move a meal plan item to a new slot. If the destination slot is occupied,
+ * swap the two items.
+ */
+export async function moveMealPlanItem(
+  itemId: string,
+  toDayOfWeek: number,
+  toMealSlot: MealType,
+  swapWithItemId?: string
+): Promise<ActionResult> {
+  const { supabase, user } = await getAuthenticatedUser();
+  if (!supabase || !user) {
+    return { data: null, error: "Not authenticated" };
+  }
+
+  const ctx = await getHouseholdContext(supabase, user.id);
+
+  // Verify ownership via the meal plan
+  const { data: existing, error: fetchError } = await supabase
+    .from("meal_plan_items")
+    .select("*, meal_plan:meal_plans!inner(user_id, household_id, status)")
+    .eq("id", itemId)
+    .single();
+
+  if (fetchError || !existing) {
+    return { data: null, error: "Meal plan item not found" };
+  }
+
+  const owner = (existing as unknown as MealPlanItemWithOwner & { meal_plan: { status: string } }).meal_plan;
+  const isOwner = ctx.householdId
+    ? owner?.household_id === ctx.householdId
+    : owner?.user_id === user.id;
+
+  if (!isOwner) {
+    return { data: null, error: "Meal plan item not found" };
+  }
+
+  if (owner?.status === "finalized") {
+    return { data: null, error: "Cannot modify a finalized meal plan" };
+  }
+
+  // If swapping, update the other item to take the source's position
+  if (swapWithItemId) {
+    const { error: swapError } = await supabase
+      .from("meal_plan_items")
+      .update({
+        day_of_week: existing.day_of_week,
+        meal_slot: existing.meal_slot,
+      })
+      .eq("id", swapWithItemId);
+
+    if (swapError) {
+      return { data: null, error: swapError.message };
+    }
+  }
+
+  // Move the dragged item to the destination
+  const { error: moveError } = await supabase
+    .from("meal_plan_items")
+    .update({
+      day_of_week: toDayOfWeek,
+      meal_slot: toMealSlot,
+    })
+    .eq("id", itemId);
+
+  if (moveError) {
+    return { data: null, error: moveError.message };
+  }
+
+  revalidatePath("/plan", "layout");
+
+  return { data: null, error: null };
+}
+
+// ---------------------------------------------------------------------------
+// 10. getRecipesForPicker
 // ---------------------------------------------------------------------------
 
 /**

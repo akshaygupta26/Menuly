@@ -3,6 +3,12 @@
 import { useMemo } from "react";
 import { addDays, format, parseISO } from "date-fns";
 import { Plus, X, Sparkles, Lock, Unlock, ShoppingCart, CalendarDays, Trash2, Flame } from "lucide-react";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DropResult,
+} from "@hello-pangea/dnd";
 
 import type { MealPlan, MealPlanItemWithRecipe, MealType } from "@/types/database";
 import { cn } from "@/lib/utils";
@@ -30,6 +36,7 @@ interface WeekGridProps {
   onAddItem: (dayOfWeek: number, mealSlot: MealType) => void;
   onSuggestItem?: (dayOfWeek: number, mealSlot: MealType) => void;
   onRemoveItem: (itemId: string) => void;
+  onMoveItem?: (itemId: string, toDayOfWeek: number, toMealSlot: MealType, swapWithItemId?: string) => void;
   onClearAll: () => void;
   onClearSlot: (slot: MealType) => void;
   onFinalize: () => void;
@@ -172,15 +179,17 @@ function MealSlotCell({
           "group relative rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
           SLOT_COLORS[mealSlot]
         )}
-        data-droppable={`${dayOfWeek}-${mealSlot}`}
       >
-        <div className="flex items-center gap-1.5">
-          <span className="min-w-0 truncate">{displayName}</span>
+        <div className="flex items-center gap-1">
+          <span className="min-w-0 truncate flex-1">{displayName}</span>
           {!isFinalized && (
             <button
               type="button"
-              onClick={() => onRemove(item.id)}
-              className="ml-auto shrink-0 rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-black/10 group-hover:opacity-100 dark:hover:bg-white/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(item.id);
+              }}
+              className="shrink-0 rounded-sm p-0.5 opacity-40 transition-opacity hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10"
               aria-label={`Remove ${displayName}`}
             >
               <X className="size-3" />
@@ -239,6 +248,7 @@ export function WeekGrid({
   onAddItem,
   onSuggestItem,
   onRemoveItem,
+  onMoveItem,
   onClearAll,
   onClearSlot,
   onFinalize,
@@ -272,238 +282,302 @@ export function WeekGrid({
     return totals;
   }, [mealPlan]);
 
-  return (
-    <div className="space-y-4">
-      {/* Action bar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onAutoGenerate}
-          disabled={isPending || isFinalized}
-        >
-          <Sparkles className="size-3.5" />
-          Auto-Generate
-        </Button>
+  // DnD handler: droppableId format is "dayOfWeek-mealSlot" (e.g. "1-dinner")
+  // draggableId is the meal_plan_item.id
+  function handleDragEnd(result: DropResult) {
+    if (!result.destination || !onMoveItem) return;
+    const { source, destination, draggableId } = result;
+    if (source.droppableId === destination.droppableId) return;
 
-        {!isFinalized && mealPlan?.items && mealPlan.items.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isPending}
-                className="text-destructive"
-              >
-                <Trash2 className="size-3.5" />
-                Clear
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              {mealSlots.map((slot) => {
-                const count = mealPlan.items.filter((i) => i.meal_slot === slot).length;
-                if (count === 0) return null;
-                return (
-                  <DropdownMenuItem
-                    key={slot}
-                    onClick={() => onClearSlot(slot)}
+    const [toDow, toSlot] = destination.droppableId.split("-");
+    const toDayOfWeek = parseInt(toDow, 10);
+    const toMealSlot = toSlot as MealType;
+
+    // Check if destination slot is occupied
+    const destItem = itemsByKey.get(destination.droppableId);
+    onMoveItem(draggableId, toDayOfWeek, toMealSlot, destItem?.id);
+  }
+
+  // Helper to render a slot cell wrapped in Droppable + Draggable
+  function renderDndSlot(
+    dayOfWeek: number,
+    slot: MealType,
+    item: MealPlanItemWithRecipe | undefined
+  ) {
+    const droppableId = `${dayOfWeek}-${slot}`;
+    const canDrag = !isFinalized && !!onMoveItem;
+
+    return (
+      <Droppable droppableId={droppableId} isDropDisabled={isFinalized || !onMoveItem}>
+        {(dropProvided, dropSnapshot) => (
+          <div
+            ref={dropProvided.innerRef}
+            {...dropProvided.droppableProps}
+            className={cn(
+              "min-h-[36px] rounded-md transition-colors",
+              dropSnapshot.isDraggingOver && !item && "bg-primary/10 ring-1 ring-primary/30",
+              dropSnapshot.isDraggingOver && item && "ring-1 ring-primary/30"
+            )}
+          >
+            {item && canDrag ? (
+              <Draggable draggableId={item.id} index={0}>
+                {(dragProvided, dragSnapshot) => (
+                  <div
+                    ref={dragProvided.innerRef}
+                    {...dragProvided.draggableProps}
+                    {...dragProvided.dragHandleProps}
+                    className={cn(
+                      dragSnapshot.isDragging && "opacity-80 shadow-lg rounded-md"
+                    )}
                   >
-                    All {SLOT_LABELS[slot]}
-                    <span className="ml-auto text-xs text-muted-foreground">{count}</span>
-                  </DropdownMenuItem>
-                );
-              })}
-              <DropdownMenuItem
-                onClick={onClearAll}
-                className="text-destructive focus:text-destructive"
-              >
-                Clear Entire Week
-                <span className="ml-auto text-xs text-muted-foreground">{mealPlan.items.length}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    <MealSlotCell
+                      item={item}
+                      mealSlot={slot}
+                      dayOfWeek={dayOfWeek}
+                      isFinalized={isFinalized}
+                      onAdd={() => onAddItem(dayOfWeek, slot)}
+                      onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
+                      onRemove={onRemoveItem}
+                    />
+                  </div>
+                )}
+              </Draggable>
+            ) : (
+              <MealSlotCell
+                item={item}
+                mealSlot={slot}
+                dayOfWeek={dayOfWeek}
+                isFinalized={isFinalized}
+                onAdd={() => onAddItem(dayOfWeek, slot)}
+                onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
+                onRemove={onRemoveItem}
+              />
+            )}
+            {dropProvided.placeholder}
+          </div>
         )}
+      </Droppable>
+    );
+  }
 
-        {isFinalized ? (
+  return (
+    <DragDropContext onDragEnd={handleDragEnd}>
+      <div className="space-y-4">
+        {/* Action bar */}
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={onUnfinalize}
-            disabled={isPending}
+            onClick={onAutoGenerate}
+            disabled={isPending || isFinalized}
           >
-            <Unlock className="size-3.5" />
-            Unfinalize
+            <Sparkles className="size-3.5" />
+            Auto-Generate
           </Button>
-        ) : (
-          <Button
-            size="sm"
-            onClick={onFinalize}
-            disabled={isPending}
-          >
-            <Lock className="size-3.5" />
-            Finalize Week
-          </Button>
-        )}
 
-        {isFinalized && (
-          <>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onGenerateGroceryList}
-              disabled={isPending}
-            >
-              <ShoppingCart className="size-3.5" />
-              Generate Grocery List
-            </Button>
-            <Badge variant="secondary" className="ml-auto">
-              <Lock className="size-3" />
-              Finalized
-            </Badge>
-          </>
-        )}
-      </div>
-
-      {/* Empty state guidance */}
-      {!isFinalized && (!mealPlan?.items || mealPlan.items.length === 0) && (
-        <div className="rounded-lg border border-dashed border-border bg-muted/30 px-6 py-8 text-center">
-          <CalendarDays className="mx-auto mb-3 size-10 text-muted-foreground/50" />
-          <h3 className="mb-1 text-sm font-semibold">No meals planned yet</h3>
-          <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-            Tap the <strong>+</strong> button on any slot below to add a recipe, or use{" "}
-            <strong>Auto-Generate</strong> to fill the whole week from your recipe library.
-          </p>
-        </div>
-      )}
-
-      {/* ----------------------------------------------------------------- */}
-      {/* Desktop grid (hidden on mobile) */}
-      {/* ----------------------------------------------------------------- */}
-      <div className="hidden md:block overflow-x-auto">
-        <div
-          className="grid min-w-[700px] gap-px rounded-lg border border-border bg-border"
-          style={{ gridTemplateColumns: `repeat(7, 1fr)` }}
-        >
-          {/* Day headers */}
-          {dayDates.map(({ dayOfWeek, date }) => (
-            <div
-              key={`header-${dayOfWeek}`}
-              className="bg-muted/50 px-2 py-2 text-center"
-            >
-              <div className="text-xs font-medium text-muted-foreground">
-                {format(date, "EEE")}
-              </div>
-              <div className="text-sm font-semibold">
-                {format(date, "MMM d")}
-              </div>
-            </div>
-          ))}
-
-          {/* Meal slot rows */}
-          {mealSlots.map((slot) =>
-            dayDates.map(({ dayOfWeek }) => {
-              const item = itemsByKey.get(`${dayOfWeek}-${slot}`);
-              return (
-                <div
-                  key={`${dayOfWeek}-${slot}`}
-                  className="flex flex-col gap-1 bg-background p-1.5"
+          {!isFinalized && mealPlan?.items && mealPlan.items.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending}
+                  className="text-destructive"
                 >
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-                    {SLOT_LABELS[slot]}
-                  </span>
-                  <MealSlotCell
-                    item={item}
-                    mealSlot={slot}
-                    dayOfWeek={dayOfWeek}
-                    isFinalized={isFinalized}
-                    onAdd={() => onAddItem(dayOfWeek, slot)}
-                    onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
-                    onRemove={onRemoveItem}
-                  />
-                </div>
-              );
-            })
+                  <Trash2 className="size-3.5" />
+                  Clear
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {mealSlots.map((slot) => {
+                  const count = mealPlan.items.filter((i) => i.meal_slot === slot).length;
+                  if (count === 0) return null;
+                  return (
+                    <DropdownMenuItem
+                      key={slot}
+                      onClick={() => onClearSlot(slot)}
+                    >
+                      All {SLOT_LABELS[slot]}
+                      <span className="ml-auto text-xs text-muted-foreground">{count}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuItem
+                  onClick={onClearAll}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Clear Entire Week
+                  <span className="ml-auto text-xs text-muted-foreground">{mealPlan.items.length}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
 
-          {/* Day nutrition totals row */}
-          {dayDates.map(({ dayOfWeek }) => {
-            const totals = dayTotals.get(dayOfWeek);
-            return (
-              <div
-                key={`totals-${dayOfWeek}`}
-                className="flex items-center justify-center bg-muted/30 p-1.5"
+          {isFinalized ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onUnfinalize}
+              disabled={isPending}
+            >
+              <Unlock className="size-3.5" />
+              Unfinalize
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={onFinalize}
+              disabled={isPending}
+            >
+              <Lock className="size-3.5" />
+              Finalize Week
+            </Button>
+          )}
+
+          {isFinalized && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onGenerateGroceryList}
+                disabled={isPending}
               >
-                {totals ? (
-                  <DayNutritionSummary totals={totals} compact />
-                ) : (
-                  <span className="text-[10px] text-muted-foreground/40">--</span>
-                )}
-              </div>
-            );
-          })}
+                <ShoppingCart className="size-3.5" />
+                Generate Grocery List
+              </Button>
+              <Badge variant="secondary" className="ml-auto">
+                <Lock className="size-3" />
+                Finalized
+              </Badge>
+            </>
+          )}
         </div>
-      </div>
 
-      {/* ----------------------------------------------------------------- */}
-      {/* Mobile vertical list (hidden on desktop) */}
-      {/* ----------------------------------------------------------------- */}
-      <div className="space-y-3 md:hidden">
-        {dayDates.map(({ dayOfWeek, date }) => (
+        {/* Empty state guidance */}
+        {!isFinalized && (!mealPlan?.items || mealPlan.items.length === 0) && (
+          <div className="rounded-lg border border-dashed border-border bg-muted/30 px-6 py-8 text-center">
+            <CalendarDays className="mx-auto mb-3 size-10 text-muted-foreground/50" />
+            <h3 className="mb-1 text-sm font-semibold">No meals planned yet</h3>
+            <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+              Tap the <strong>+</strong> button on any slot below to add a recipe, or use{" "}
+              <strong>Auto-Generate</strong> to fill the whole week from your recipe library.
+            </p>
+          </div>
+        )}
+
+        {/* ----------------------------------------------------------------- */}
+        {/* Desktop grid (hidden on mobile) */}
+        {/* ----------------------------------------------------------------- */}
+        <div className="hidden md:block overflow-x-auto">
           <div
-            key={`mobile-${dayOfWeek}`}
-            className="rounded-lg border border-border"
+            className="grid min-w-[700px] gap-px rounded-lg border border-border bg-border"
+            style={{ gridTemplateColumns: `repeat(7, 1fr)` }}
           >
-            {/* Day header */}
-            <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-2">
-              <span className="text-sm font-semibold">
-                {format(date, "EEE")}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {format(date, "MMM d")}
-              </span>
-            </div>
+            {/* Day headers */}
+            {dayDates.map(({ dayOfWeek, date }) => (
+              <div
+                key={`header-${dayOfWeek}`}
+                className="bg-muted/50 px-2 py-2 text-center"
+              >
+                <div className="text-xs font-medium text-muted-foreground">
+                  {format(date, "EEE")}
+                </div>
+                <div className="text-sm font-semibold">
+                  {format(date, "MMM d")}
+                </div>
+              </div>
+            ))}
 
-            {/* Slots */}
-            <div className="divide-y divide-border">
-              {mealSlots.map((slot) => {
+            {/* Meal slot rows */}
+            {mealSlots.map((slot) =>
+              dayDates.map(({ dayOfWeek }) => {
                 const item = itemsByKey.get(`${dayOfWeek}-${slot}`);
                 return (
                   <div
                     key={`${dayOfWeek}-${slot}`}
-                    className="flex items-center gap-3 px-3 py-2"
+                    className="flex flex-col gap-1 bg-background p-1.5"
                   >
-                    <span className="w-14 shrink-0 text-[11px] sm:text-xs font-medium text-muted-foreground">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
                       {SLOT_LABELS[slot]}
                     </span>
-                    <div className="min-w-0 flex-1">
-                      <MealSlotCell
-                        item={item}
-                        mealSlot={slot}
-                        dayOfWeek={dayOfWeek}
-                        isFinalized={isFinalized}
-                        onAdd={() => onAddItem(dayOfWeek, slot)}
-                        onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
-                        onRemove={onRemoveItem}
-                      />
-                    </div>
+                    {renderDndSlot(dayOfWeek, slot, item)}
                   </div>
                 );
-              })}
-            </div>
+              })
+            )}
 
-            {/* Day nutrition totals footer */}
-            {(() => {
+            {/* Day nutrition totals row */}
+            {dayDates.map(({ dayOfWeek }) => {
               const totals = dayTotals.get(dayOfWeek);
-              if (!totals) return null;
               return (
-                <div className="border-t bg-muted/30 px-3 py-2">
-                  <DayNutritionSummary totals={totals} />
+                <div
+                  key={`totals-${dayOfWeek}`}
+                  className="flex items-center justify-center bg-muted/30 p-1.5"
+                >
+                  {totals ? (
+                    <DayNutritionSummary totals={totals} compact />
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground/40">--</span>
+                  )}
                 </div>
               );
-            })()}
+            })}
           </div>
-        ))}
+        </div>
+
+        {/* ----------------------------------------------------------------- */}
+        {/* Mobile vertical list (hidden on desktop) */}
+        {/* ----------------------------------------------------------------- */}
+        <div className="space-y-3 md:hidden">
+          {dayDates.map(({ dayOfWeek, date }) => (
+            <div
+              key={`mobile-${dayOfWeek}`}
+              className="rounded-lg border border-border"
+            >
+              {/* Day header */}
+              <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-2">
+                <span className="text-sm font-semibold">
+                  {format(date, "EEE")}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {format(date, "MMM d")}
+                </span>
+              </div>
+
+              {/* Slots */}
+              <div className="divide-y divide-border">
+                {mealSlots.map((slot) => {
+                  const item = itemsByKey.get(`${dayOfWeek}-${slot}`);
+                  return (
+                    <div
+                      key={`${dayOfWeek}-${slot}`}
+                      className="flex items-center gap-3 px-3 py-2"
+                    >
+                      <span className="w-14 shrink-0 text-[11px] sm:text-xs font-medium text-muted-foreground">
+                        {SLOT_LABELS[slot]}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        {renderDndSlot(dayOfWeek, slot, item)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Day nutrition totals footer */}
+              {(() => {
+                const totals = dayTotals.get(dayOfWeek);
+                if (!totals) return null;
+                return (
+                  <div className="border-t bg-muted/30 px-3 py-2">
+                    <DayNutritionSummary totals={totals} />
+                  </div>
+                );
+              })()}
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </DragDropContext>
   );
 }

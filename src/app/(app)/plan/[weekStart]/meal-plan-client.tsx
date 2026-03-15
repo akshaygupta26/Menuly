@@ -13,6 +13,7 @@ import type {
 import {
   addMealPlanItem,
   removeMealPlanItem,
+  moveMealPlanItem,
   clearAllMealPlanItems,
   clearMealPlanSlot,
   finalizeMealPlan,
@@ -247,6 +248,29 @@ export function MealPlanClient({
     });
   }
 
+  function handleMoveItem(
+    itemId: string,
+    toDayOfWeek: number,
+    toMealSlot: MealType,
+    swapWithItemId?: string
+  ) {
+    startTransition(async () => {
+      const { error } = await moveMealPlanItem(
+        itemId,
+        toDayOfWeek,
+        toMealSlot,
+        swapWithItemId
+      );
+
+      if (error) {
+        toast.error(error);
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
   function handleAutoGenerate() {
     if (!mealPlan) return;
     startTransition(async () => {
@@ -298,6 +322,7 @@ export function MealPlanClient({
         onAddItem={handleOpenPicker}
         onSuggestItem={mealPlan ? handleOpenSuggestion : undefined}
         onRemoveItem={handleRemoveItem}
+        onMoveItem={handleMoveItem}
         onClearAll={handleClearAll}
         onClearSlot={handleClearSlot}
         onFinalize={handleFinalize}
