@@ -77,7 +77,7 @@ export async function getHousehold(): Promise<ActionResult<HouseholdResponse>> {
     return { data: null, error: "Household not found" };
   }
 
-  // Fetch members with profile emails
+  // Fetch members with joined_at
   const { data: members, error: membersError } = await supabase
     .from("household_members")
     .select("user_id, joined_at")
@@ -87,20 +87,21 @@ export async function getHousehold(): Promise<ActionResult<HouseholdResponse>> {
     return { data: null, error: membersError.message };
   }
 
-  // Get emails from profiles
-  const userIds = (members ?? []).map((m) => m.user_id);
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("user_id, email")
-    .in("user_id", userIds);
+  // Get emails via SECURITY DEFINER RPC (falls back to auth.users if profiles.email is NULL)
+  const { data: emailRows } = await supabase.rpc(
+    "get_household_member_emails",
+    { p_household_id: household.id }
+  );
 
-  const profileMap = new Map(
-    (profiles ?? []).map((p) => [p.user_id, p.email as string | null])
+  const emailMap = new Map(
+    ((emailRows as { user_id: string; email: string | null }[]) ?? []).map(
+      (r) => [r.user_id, r.email]
+    )
   );
 
   const memberInfos: HouseholdMemberInfo[] = (members ?? []).map((m) => ({
     user_id: m.user_id,
-    email: profileMap.get(m.user_id) ?? null,
+    email: emailMap.get(m.user_id) ?? null,
     joined_at: m.joined_at,
     role: m.user_id === household.owner_id ? "owner" : "member",
   }));
