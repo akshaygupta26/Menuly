@@ -44,11 +44,17 @@ export function RecipeListClient({ recipes: initial }: RecipeListClientProps) {
     }
 
     if (filters.cuisineType) {
-      result = result.filter((r) => r.cuisine_type === filters.cuisineType);
+      const ct = filters.cuisineType.toLowerCase();
+      result = result.filter(
+        (r) => r.cuisine_type?.toLowerCase() === ct
+      );
     }
 
     if (filters.proteinType) {
-      result = result.filter((r) => r.protein_type === filters.proteinType);
+      const pt = filters.proteinType.toLowerCase();
+      result = result.filter(
+        (r) => r.protein_type?.toLowerCase() === pt
+      );
     }
 
     if (filters.mealType) {
