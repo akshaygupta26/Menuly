@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { createPortal } from "react-dom";
 import { addDays, format, parseISO } from "date-fns";
 import { Plus, X, Sparkles, Lock, Unlock, ShoppingCart, CalendarDays, Trash2, Flame } from "lucide-react";
 import {
@@ -9,8 +8,6 @@ import {
   Droppable,
   Draggable,
   type DropResult,
-  type DraggableProvided,
-  type DraggableStateSnapshot,
 } from "@hello-pangea/dnd";
 
 import type { MealPlan, MealPlanItemWithRecipe, MealType } from "@/types/database";
@@ -301,35 +298,6 @@ export function WeekGrid({
     onMoveItem(draggableId, toDayOfWeek, toMealSlot, destItem?.id);
   }
 
-  // Portal wrapper — renders dragged element outside the grid's overflow container
-  function PortalAwareDraggable({
-    provided,
-    snapshot,
-    children,
-  }: {
-    provided: DraggableProvided;
-    snapshot: DraggableStateSnapshot;
-    children: React.ReactNode;
-  }) {
-    const element = (
-      <div
-        ref={provided.innerRef}
-        {...provided.draggableProps}
-        {...provided.dragHandleProps}
-        className={cn(
-          snapshot.isDragging && "opacity-90 shadow-lg rounded-md"
-        )}
-      >
-        {children}
-      </div>
-    );
-
-    if (snapshot.isDragging) {
-      return createPortal(element, document.body);
-    }
-    return element;
-  }
-
   // Helper to render a slot cell wrapped in Droppable + Draggable
   function renderDndSlot(
     dayOfWeek: number,
@@ -354,7 +322,14 @@ export function WeekGrid({
             {item && canDrag ? (
               <Draggable draggableId={item.id} index={0}>
                 {(dragProvided, dragSnapshot) => (
-                  <PortalAwareDraggable provided={dragProvided} snapshot={dragSnapshot}>
+                  <div
+                    ref={dragProvided.innerRef}
+                    {...dragProvided.draggableProps}
+                    {...dragProvided.dragHandleProps}
+                    className={cn(
+                      dragSnapshot.isDragging && "opacity-90 shadow-lg rounded-md z-50"
+                    )}
+                  >
                     <MealSlotCell
                       item={item}
                       mealSlot={slot}
@@ -364,7 +339,7 @@ export function WeekGrid({
                       onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
                       onRemove={onRemoveItem}
                     />
-                  </PortalAwareDraggable>
+                  </div>
                 )}
               </Draggable>
             ) : (
@@ -493,7 +468,7 @@ export function WeekGrid({
         {/* ----------------------------------------------------------------- */}
         {/* Desktop grid (hidden on mobile) */}
         {/* ----------------------------------------------------------------- */}
-        <div className="hidden md:block overflow-x-auto">
+        <div className="hidden md:block">
           <div
             className="grid min-w-[700px] gap-px rounded-lg border border-border bg-border"
             style={{ gridTemplateColumns: `repeat(7, 1fr)` }}
