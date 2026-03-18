@@ -557,7 +557,15 @@ export function WeekGrid({
                         {SLOT_LABELS[slot]}
                       </span>
                       <div className="min-w-0 flex-1">
-                        {renderDndSlot(dayOfWeek, slot, item)}
+                        <MealSlotCell
+                          item={item}
+                          mealSlot={slot}
+                          dayOfWeek={dayOfWeek}
+                          isFinalized={isFinalized}
+                          onAdd={() => onAddItem(dayOfWeek, slot)}
+                          onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
+                          onRemove={onRemoveItem}
+                        />
                       </div>
                     </div>
                   );
