@@ -35,6 +35,7 @@ interface WeekGridProps {
   mealSlots: MealType[];
   onAddItem: (dayOfWeek: number, mealSlot: MealType) => void;
   onSuggestItem?: (dayOfWeek: number, mealSlot: MealType) => void;
+  onReplaceItem?: (dayOfWeek: number, mealSlot: MealType, itemId: string) => void;
   onRemoveItem: (itemId: string) => void;
   onMoveItem?: (itemId: string, toDayOfWeek: number, toMealSlot: MealType, swapWithItemId?: string) => void;
   onClearAll: () => void;
@@ -160,6 +161,7 @@ function MealSlotCell({
   onAdd,
   onSuggest,
   onRemove,
+  onReplace,
   dragHandleProps,
 }: {
   item: MealPlanItemWithRecipe | undefined;
@@ -169,6 +171,7 @@ function MealSlotCell({
   onAdd: () => void;
   onSuggest?: () => void;
   onRemove: (id: string) => void;
+  onReplace?: () => void;
   dragHandleProps?: Record<string, unknown>;
 }) {
   if (item) {
@@ -192,7 +195,18 @@ function MealSlotCell({
               <GripVertical className="size-3" />
             </span>
           )}
-          <span className="min-w-0 truncate flex-1">{displayName}</span>
+          {onReplace ? (
+            <button
+              type="button"
+              onClick={onReplace}
+              className="min-w-0 truncate flex-1 text-left hover:underline"
+              title="Click to change recipe"
+            >
+              {displayName}
+            </button>
+          ) : (
+            <span className="min-w-0 truncate flex-1">{displayName}</span>
+          )}
           {!isFinalized && (
             <button
               type="button"
@@ -258,6 +272,7 @@ export function WeekGrid({
   mealSlots,
   onAddItem,
   onSuggestItem,
+  onReplaceItem,
   onRemoveItem,
   onMoveItem,
   onClearAll,
@@ -348,6 +363,7 @@ export function WeekGrid({
                       onAdd={() => onAddItem(dayOfWeek, slot)}
                       onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
                       onRemove={onRemoveItem}
+                      onReplace={item && onReplaceItem ? () => onReplaceItem(dayOfWeek, slot, item.id) : undefined}
                       dragHandleProps={dragProvided.dragHandleProps as unknown as Record<string, unknown>}
                     />
                   </div>
@@ -362,6 +378,7 @@ export function WeekGrid({
                 onAdd={() => onAddItem(dayOfWeek, slot)}
                 onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
                 onRemove={onRemoveItem}
+                onReplace={item && onReplaceItem ? () => onReplaceItem(dayOfWeek, slot, item.id) : undefined}
               />
             )}
             {dropProvided.placeholder}
@@ -576,6 +593,7 @@ export function WeekGrid({
                           onAdd={() => onAddItem(dayOfWeek, slot)}
                           onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
                           onRemove={onRemoveItem}
+                          onReplace={item && onReplaceItem ? () => onReplaceItem(dayOfWeek, slot, item.id) : undefined}
                         />
                       </div>
                     </div>

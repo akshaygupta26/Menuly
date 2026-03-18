@@ -12,6 +12,7 @@ import type {
 } from "@/types/database";
 import {
   addMealPlanItem,
+  updateMealPlanItem,
   removeMealPlanItem,
   moveMealPlanItem,
   clearAllMealPlanItems,
@@ -51,6 +52,7 @@ interface PickerState {
   open: boolean;
   dayOfWeek: number;
   mealSlot: MealType;
+  replaceItemId?: string; // set when replacing an existing item
 }
 
 // ---------------------------------------------------------------------------
@@ -125,8 +127,8 @@ export function MealPlanClient({
 
   // ---- Handlers -----------------------------------------------------------
 
-  function handleOpenPicker(dayOfWeek: number, mealSlot: MealType) {
-    setPicker({ open: true, dayOfWeek, mealSlot });
+  function handleOpenPicker(dayOfWeek: number, mealSlot: MealType, replaceItemId?: string) {
+    setPicker({ open: true, dayOfWeek, mealSlot, replaceItemId });
   }
 
   function handleClosePicker() {
@@ -146,24 +148,43 @@ export function MealPlanClient({
   }
 
   function handleSelectRecipe(recipeId: string | null, recipeName: string) {
+    const replaceItemId = picker.replaceItemId;
     handleClosePicker();
     if (!mealPlan) return;
 
     startTransition(async () => {
-      const { error } = await addMealPlanItem(
-        mealPlan!.id,
-        picker.dayOfWeek,
-        picker.mealSlot,
-        recipeId ?? undefined,
-        recipeId ? undefined : recipeName
-      );
+      if (replaceItemId) {
+        // Replacing an existing item
+        const { error } = await updateMealPlanItem(
+          replaceItemId,
+          recipeId ?? undefined,
+          recipeId ? undefined : recipeName
+        );
 
-      if (error) {
-        toast.error(error);
-        return;
+        if (error) {
+          toast.error(error);
+          return;
+        }
+
+        toast.success(`Replaced with "${recipeName}".`);
+      } else {
+        // Adding a new item
+        const { error } = await addMealPlanItem(
+          mealPlan!.id,
+          picker.dayOfWeek,
+          picker.mealSlot,
+          recipeId ?? undefined,
+          recipeId ? undefined : recipeName
+        );
+
+        if (error) {
+          toast.error(error);
+          return;
+        }
+
+        toast.success(`Added "${recipeName}" to the plan.`);
       }
 
-      toast.success(`Added "${recipeName}" to the plan.`);
       router.refresh();
     });
   }
@@ -321,6 +342,7 @@ export function MealPlanClient({
         mealSlots={mealSlots}
         onAddItem={handleOpenPicker}
         onSuggestItem={mealPlan ? handleOpenSuggestion : undefined}
+        onReplaceItem={(dayOfWeek, mealSlot, itemId) => handleOpenPicker(dayOfWeek, mealSlot, itemId)}
         onRemoveItem={handleRemoveItem}
         onMoveItem={handleMoveItem}
         onClearAll={handleClearAll}
