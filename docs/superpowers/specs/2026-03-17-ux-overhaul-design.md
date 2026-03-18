@@ -99,10 +99,10 @@
   - 16:9 aspect ratio (existing)
   - Favorite heart button (top-right, circular white bg): click triggers fill animation + scale bounce (1.0 → 1.2 → 1.0, 300ms)
   - "Last made X ago" pill badge (bottom-left of image, semi-transparent dark bg) — only if data exists
-- Content section:
-  - Recipe name in slightly larger, semi-bold font
-  - One-line description/subtitle in italic, muted color (if available from AI generation or notes field)
-  - Metadata row at bottom, separated by thin top border: `30 min · 4 servings · 450 cal`
+- Content section (top to bottom):
+  1. Recipe name — slightly larger, semi-bold font
+  2. Subtitle — one-line from `notes` field (first sentence, truncated), italic, muted color. Hidden when `notes` is empty (card height shrinks gracefully).
+  3. Metadata row — separated by thin top border: `30 min · 4 servings · 450 cal`
   - No more badge soup — cuisine/protein shown only in list mode or on hover
 - No-image fallback: Gradient background using recipe cuisine color mapping:
 
