@@ -468,10 +468,10 @@ export function WeekGrid({
         {/* ----------------------------------------------------------------- */}
         {/* Desktop grid (hidden on mobile) */}
         {/* ----------------------------------------------------------------- */}
-        <div className="hidden md:block">
+        <div className="hidden md:block overflow-x-auto">
           <div
             className="grid min-w-[700px] gap-px rounded-lg border border-border bg-border"
-            style={{ gridTemplateColumns: `repeat(7, 1fr)` }}
+            style={{ gridTemplateColumns: `repeat(7, minmax(0, 1fr))` }}
           >
             {/* Day headers */}
             {dayDates.map(({ dayOfWeek, date }) => (
@@ -495,7 +495,7 @@ export function WeekGrid({
                 return (
                   <div
                     key={`${dayOfWeek}-${slot}`}
-                    className="flex flex-col gap-1 bg-background p-1.5"
+                    className="flex min-w-0 flex-col gap-1 bg-background p-1.5"
                   >
                     <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
                       {SLOT_LABELS[slot]}
