@@ -5,6 +5,7 @@ import { Search, UtensilsCrossed, Pen, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import type { MealType } from "@/types/database";
+import { matchesSearch } from "@/lib/search";
 import { getRecipesForPicker } from "@/actions/meal-plans";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -98,8 +99,7 @@ export function RecipePickerDialog({
   const filtered = useMemo(() => {
     let list = recipes;
     if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((r) => r.name.toLowerCase().includes(q));
+      list = list.filter((r) => matchesSearch(r.name, search));
     }
     if (mealTypeFilter) {
       list = list.filter((r) => r.meal_type.includes(mealTypeFilter));

@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import type { Recipe, MealType } from "@/types/database";
 import { toggleFavorite } from "@/actions/recipes";
+import { matchesSearch } from "@/lib/search";
 import { RecipeCard } from "@/components/recipes/recipe-card";
 import {
   RecipeFiltersBar,
@@ -35,11 +36,10 @@ export function RecipeListClient({ recipes: initial }: RecipeListClientProps) {
     let result = recipes;
 
     if (filters.search) {
-      const q = filters.search.toLowerCase();
       result = result.filter(
         (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.tags.some((t) => t.toLowerCase().includes(q))
+          matchesSearch(r.name, filters.search) ||
+          r.tags.some((t) => matchesSearch(t, filters.search))
       );
     }
 

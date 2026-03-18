@@ -176,7 +176,7 @@ function MealSlotCell({
     return (
       <div
         className={cn(
-          "group relative rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+          "group relative overflow-hidden rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
           SLOT_COLORS[mealSlot]
         )}
       >
@@ -197,7 +197,7 @@ function MealSlotCell({
           )}
         </div>
         {showNutrition && (
-          <div className="mt-0.5 text-[10px] font-normal opacity-60">
+          <div className="mt-0.5 truncate text-[10px] font-normal opacity-60">
             {Math.round(item.recipe!.calories!)} kcal · P {Math.round(item.recipe!.protein_g ?? 0)}g · C {Math.round(item.recipe!.carbs_g ?? 0)}g · F {Math.round(item.recipe!.fat_g ?? 0)}g
             <span className="ml-1 italic">/ serving</span>
           </div>
@@ -528,7 +528,7 @@ export function WeekGrid({
         {/* ----------------------------------------------------------------- */}
         {/* Mobile vertical list (hidden on desktop) */}
         {/* ----------------------------------------------------------------- */}
-        <div className="space-y-3 md:hidden">
+        <div className="space-y-3 overflow-x-hidden md:hidden">
           {dayDates.map(({ dayOfWeek, date }) => (
             <div
               key={`mobile-${dayOfWeek}`}
