@@ -359,6 +359,13 @@ export function MealPlanClient({
         onClose={handleClosePicker}
         onSelect={handleSelectRecipe}
         mealSlot={picker.mealSlot}
+        currentRecipeName={
+          picker.replaceItemId
+            ? mealPlan?.items?.find((i) => i.id === picker.replaceItemId)?.recipe?.name ??
+              mealPlan?.items?.find((i) => i.id === picker.replaceItemId)?.custom_name ??
+              undefined
+            : undefined
+        }
       />
 
       {mealPlan && (

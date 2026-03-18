@@ -39,6 +39,7 @@ interface RecipePickerDialogProps {
   onClose: () => void;
   onSelect: (recipeId: string | null, recipeName: string) => void;
   mealSlot: MealType;
+  currentRecipeName?: string;
 }
 
 const MEAL_TYPE_LABELS: Record<MealType, string> = {
@@ -57,6 +58,7 @@ export function RecipePickerDialog({
   onClose,
   onSelect,
   mealSlot,
+  currentRecipeName,
 }: RecipePickerDialogProps) {
   const [recipes, setRecipes] = useState<PickerRecipe[]>([]);
   const [search, setSearch] = useState("");
@@ -122,12 +124,22 @@ export function RecipePickerDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            Pick a Recipe
+            {currentRecipeName ? "Replace Recipe" : "Pick a Recipe"}
           </DialogTitle>
           <DialogDescription>
-            Choose a recipe for{" "}
-            <span className="font-medium capitalize">{mealSlot}</span>, or enter
-            a custom name.
+            {currentRecipeName ? (
+              <>
+                Replacing{" "}
+                <span className="font-medium text-foreground">{currentRecipeName}</span>{" "}
+                for <span className="font-medium capitalize">{mealSlot}</span>.
+              </>
+            ) : (
+              <>
+                Choose a recipe for{" "}
+                <span className="font-medium capitalize">{mealSlot}</span>, or enter
+                a custom name.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -235,13 +247,13 @@ export function RecipePickerDialog({
                   </span>
                 </div>
               ) : (
-                <div className="space-y-1 pr-3">
+                <div className="space-y-1">
                   {filtered.map((recipe) => (
                     <button
                       key={recipe.id}
                       type="button"
                       onClick={() => handlePickRecipe(recipe)}
-                      className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium">
