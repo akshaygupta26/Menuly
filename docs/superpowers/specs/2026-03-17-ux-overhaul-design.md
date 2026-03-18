@@ -75,6 +75,14 @@
 - **Options modal fields** (cuisine, dietary restrictions, servings): These are appended to the prompt string sent to the existing `/api/recipes/generate` endpoint (e.g., `"chicken curry, Indian cuisine, vegetarian, 4 servings"`). No API schema changes needed.
 - Rate limiting (3/day) remains unchanged
 
+**AI Response Format Change:**
+- Add a `description` field to the AI-generated recipe JSON schema in `recipe-prompt-builder.ts`: `"description": "string — a short, evocative one-line tagline for the recipe (e.g., 'Creamy, aromatic comfort food with a rich tomato base'). This appears as the editorial subtitle on recipe cards."`
+- The `description` field is distinct from `notes` (which holds cooking tips, storage notes, and variations)
+- `transformToFormValues()` in the generate route must map this new field to the form
+- **Database:** Add a nullable `description TEXT` column to the `recipes` table (new migration). This column is optional — existing recipes will have `NULL` and the subtitle simply won't render on their cards.
+- **Recipe form:** Add a "Description" text input field (single line, max ~120 chars) above the notes textarea, so users can also write/edit subtitles manually
+- **URL import:** When importing from a URL, attempt to extract a description from the JSON-LD `description` field if available
+
 ---
 
 ## 2. Recipe Browsing & Cards
@@ -101,7 +109,7 @@
   - "Last made X ago" pill badge (bottom-left of image, semi-transparent dark bg) — only if data exists
 - Content section (top to bottom):
   1. Recipe name — slightly larger, semi-bold font
-  2. Subtitle — one-line from `notes` field (first sentence, truncated), italic, muted color. Hidden when `notes` is empty (card height shrinks gracefully).
+  2. Subtitle — one-line from `description` field, italic, muted color. Hidden when `description` is empty (card height shrinks gracefully). This is a short editorial tagline (e.g., "Creamy, aromatic comfort food"), distinct from `notes` which holds cooking tips/variations.
   3. Metadata row — separated by thin top border: `30 min · 4 servings · 450 cal`
   - No more badge soup — cuisine/protein shown only in list mode or on hover
 - No-image fallback: Gradient background using recipe cuisine color mapping:
@@ -260,7 +268,7 @@
 - Authentication flow
 - Settings page
 - Dashboard page
-- Backend/API changes beyond what's needed for draft recipe state
+- Backend/API changes beyond: (1) new `description` column on `recipes` table, (2) AI prompt schema update for `description` field, (3) URL import `description` extraction
 - Mobile-specific gestures (swipe) — tap works universally
 
 ---
