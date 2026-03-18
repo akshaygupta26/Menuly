@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { addDays, format, parseISO } from "date-fns";
-import { Plus, X, Sparkles, Lock, Unlock, ShoppingCart, CalendarDays, Trash2, Flame } from "lucide-react";
+import { Plus, X, Sparkles, Lock, Unlock, ShoppingCart, CalendarDays, Trash2, Flame, GripVertical } from "lucide-react";
 import {
   DragDropContext,
   Droppable,
@@ -160,6 +160,7 @@ function MealSlotCell({
   onAdd,
   onSuggest,
   onRemove,
+  dragHandleProps,
 }: {
   item: MealPlanItemWithRecipe | undefined;
   mealSlot: MealType;
@@ -168,6 +169,7 @@ function MealSlotCell({
   onAdd: () => void;
   onSuggest?: () => void;
   onRemove: (id: string) => void;
+  dragHandleProps?: Record<string, unknown>;
 }) {
   if (item) {
     const displayName = item.recipe?.name ?? item.custom_name ?? "Untitled";
@@ -181,6 +183,15 @@ function MealSlotCell({
         )}
       >
         <div className="flex items-center gap-1">
+          {dragHandleProps && (
+            <span
+              {...dragHandleProps}
+              className="shrink-0 cursor-grab opacity-30 hover:opacity-60 active:cursor-grabbing"
+              aria-label="Drag to move"
+            >
+              <GripVertical className="size-3" />
+            </span>
+          )}
           <span className="min-w-0 truncate flex-1">{displayName}</span>
           {!isFinalized && (
             <button
@@ -325,7 +336,6 @@ export function WeekGrid({
                   <div
                     ref={dragProvided.innerRef}
                     {...dragProvided.draggableProps}
-                    {...dragProvided.dragHandleProps}
                     className={cn(
                       dragSnapshot.isDragging && "opacity-90 shadow-lg rounded-md z-50"
                     )}
@@ -338,6 +348,7 @@ export function WeekGrid({
                       onAdd={() => onAddItem(dayOfWeek, slot)}
                       onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
                       onRemove={onRemoveItem}
+                      dragHandleProps={dragProvided.dragHandleProps as unknown as Record<string, unknown>}
                     />
                   </div>
                 )}
