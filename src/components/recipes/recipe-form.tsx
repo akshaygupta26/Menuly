@@ -42,6 +42,7 @@ export interface IngredientFormValues {
 
 export interface RecipeFormValues {
   name: string;
+  description: string;
   cuisine_type: string;
   protein_type: string;
   meal_type: MealType[];
@@ -145,6 +146,7 @@ export function RecipeForm({
     useForm<RecipeFormValues>({
       defaultValues: {
         name: "",
+        description: "",
         cuisine_type: "",
         protein_type: "",
         meal_type: [],
@@ -323,6 +325,16 @@ export function RecipeForm({
           id="name"
           placeholder="e.g. Chicken Parmesan"
           {...register("name", { required: true })}
+        />
+      </div>
+
+      {/* Description */}
+      <div className="space-y-2">
+        <Label htmlFor="description">Description</Label>
+        <Input
+          id="description"
+          placeholder="A short tagline — e.g., 'Creamy, aromatic comfort food'"
+          {...register("description", { maxLength: 120 })}
         />
       </div>
 

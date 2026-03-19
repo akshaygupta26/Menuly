@@ -66,6 +66,7 @@ Return ONLY a raw JSON object (no markdown, no code fences, no explanation) matc
 
 {
   "name": "string — recipe title",
+  "description": "string — a short, evocative one-line tagline for the recipe (e.g., 'Creamy, aromatic comfort food with a rich tomato base'). Max 120 chars. This appears as the editorial subtitle on recipe cards.",
   "cuisine_type": "string | null — one of: italian, mexican, indian, chinese, japanese, thai, mediterranean, american, french, korean, vietnamese, middle_eastern, greek, spanish, ethiopian, caribbean, british, german, brazilian, other",
   "protein_type": "string | null — one of: chicken, beef, pork, fish, shrimp, tofu, paneer, chickpeas, lentils, lamb, turkey, eggs, beans, none, other",
   "meal_type": ["array of: breakfast, lunch, dinner, snack"],

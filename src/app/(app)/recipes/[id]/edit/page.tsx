@@ -23,6 +23,7 @@ export default async function EditRecipePage({
   // Convert recipe + ingredients into form default values
   const defaultValues = {
     name: recipe.name,
+    description: recipe.description ?? "",
     cuisine_type: recipe.cuisine_type ?? "",
     protein_type: recipe.protein_type ?? "",
     meal_type: recipe.meal_type,

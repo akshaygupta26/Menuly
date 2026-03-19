@@ -73,6 +73,7 @@ function transformToFormValues(
 
   return {
     name: String(recipe.name),
+    description: typeof recipe.description === "string" ? recipe.description : "",
     cuisine_type:
       typeof recipe.cuisine_type === "string" ? recipe.cuisine_type : "",
     protein_type:

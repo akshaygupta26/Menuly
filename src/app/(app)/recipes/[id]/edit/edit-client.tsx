@@ -68,6 +68,7 @@ export function EditRecipeClient({
       const { error } = await updateRecipe(recipeId, {
         recipe: {
           name: values.name,
+          description: values.description || null,
           cuisine_type: values.cuisine_type || null,
           protein_type: values.protein_type || null,
           meal_type: values.meal_type as MealType[],
