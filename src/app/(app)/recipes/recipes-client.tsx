@@ -8,6 +8,7 @@ import type { Recipe, MealType } from "@/types/database";
 import { toggleFavorite } from "@/actions/recipes";
 import { matchesSearch } from "@/lib/search";
 import { RecipeCard } from "@/components/recipes/recipe-card";
+import { RecipeCardCompact } from "@/components/recipes/recipe-card-compact";
 import { DraftRecipeCard } from "@/components/recipes/draft-recipe-card";
 import { useRecipeGeneration } from "@/lib/recipe-generation-context";
 import {
@@ -33,6 +34,16 @@ export function RecipeListClient({ recipes: initial }: RecipeListClientProps) {
   const [filters, setFilters] = useState<RecipeFilters>(DEFAULT_FILTERS);
   const [isPending, startTransition] = useTransition();
   const { drafts } = useRecipeGeneration();
+  const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
+    if (typeof window === "undefined") return "grid";
+    const saved = localStorage.getItem("menuly-view-mode");
+    return saved === "list" ? "list" : "grid";
+  });
+
+  function handleViewModeChange(mode: "grid" | "list") {
+    setViewMode(mode);
+    localStorage.setItem("menuly-view-mode", mode);
+  }
 
   // Client-side filtering
   const filtered = useMemo(() => {
@@ -96,7 +107,12 @@ export function RecipeListClient({ recipes: initial }: RecipeListClientProps) {
 
   return (
     <div className="space-y-6">
-      <RecipeFiltersBar filters={filters} onChange={setFilters} />
+      <RecipeFiltersBar
+        filters={filters}
+        onChange={setFilters}
+        viewMode={viewMode}
+        onViewModeChange={handleViewModeChange}
+      />
 
       {/* Result count when filters are active */}
       {(filters.search || filters.cuisineType || filters.proteinType || filters.mealType || filters.favoritesOnly) && filtered.length > 0 && (
@@ -135,6 +151,19 @@ export function RecipeListClient({ recipes: initial }: RecipeListClientProps) {
               </Button>
             </div>
           )}
+        </div>
+      ) : viewMode === "list" ? (
+        <div
+          className="grid gap-3 sm:grid-cols-2"
+          aria-busy={isPending}
+        >
+          {filtered.map((recipe) => (
+            <RecipeCardCompact
+              key={recipe.id}
+              recipe={recipe}
+              onToggleFavorite={handleToggleFavorite}
+            />
+          ))}
         </div>
       ) : (
         <div

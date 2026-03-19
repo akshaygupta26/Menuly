@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Star, X } from "lucide-react";
+import { LayoutGrid, List, Search, Star, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -59,9 +59,11 @@ export interface RecipeFilters {
 interface RecipeFiltersProps {
   filters: RecipeFilters;
   onChange: (filters: RecipeFilters) => void;
+  viewMode?: "grid" | "list";
+  onViewModeChange?: (mode: "grid" | "list") => void;
 }
 
-export function RecipeFiltersBar({ filters, onChange }: RecipeFiltersProps) {
+export function RecipeFiltersBar({ filters, onChange, viewMode, onViewModeChange }: RecipeFiltersProps) {
   const hasActiveFilters =
     filters.search ||
     filters.cuisineType ||
@@ -117,6 +119,37 @@ export function RecipeFiltersBar({ filters, onChange }: RecipeFiltersProps) {
           />
           Favorites
         </Button>
+
+        {onViewModeChange && (
+          <div className="flex overflow-hidden rounded-md bg-muted">
+            <button
+              type="button"
+              onClick={() => onViewModeChange("grid")}
+              aria-label="Grid view"
+              className={cn(
+                "flex items-center justify-center px-2 py-1.5 transition-colors",
+                viewMode === "grid"
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <LayoutGrid className={cn("size-4", viewMode === "grid" && "fill-primary/20")} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange("list")}
+              aria-label="List view"
+              className={cn(
+                "flex items-center justify-center px-2 py-1.5 transition-colors",
+                viewMode === "list"
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <List className={cn("size-4", viewMode === "list" && "fill-primary/20")} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Selects row */}
@@ -183,7 +216,7 @@ export function RecipeFiltersBar({ filters, onChange }: RecipeFiltersProps) {
             variant="ghost"
             size="sm"
             onClick={clearFilters}
-            className="text-muted-foreground"
+            className="text-muted-foreground transition-all duration-[var(--duration-fast)]"
           >
             <X className="size-3.5" />
             Clear filters
@@ -197,41 +230,41 @@ export function RecipeFiltersBar({ filters, onChange }: RecipeFiltersProps) {
           {filters.cuisineType && (
             <Badge
               variant="secondary"
-              className="cursor-pointer"
+              className="animate-in fade-in slide-in-from-bottom-1 duration-200 cursor-pointer"
               onClick={() => updateFilter("cuisineType", "")}
             >
               {filters.cuisineType}
-              <X className="ml-1 size-3" />
+              <X className="ml-1 size-3 hover:scale-105 transition-transform" />
             </Badge>
           )}
           {filters.proteinType && (
             <Badge
               variant="secondary"
-              className="cursor-pointer"
+              className="animate-in fade-in slide-in-from-bottom-1 duration-200 cursor-pointer"
               onClick={() => updateFilter("proteinType", "")}
             >
               {filters.proteinType}
-              <X className="ml-1 size-3" />
+              <X className="ml-1 size-3 hover:scale-105 transition-transform" />
             </Badge>
           )}
           {filters.mealType && (
             <Badge
               variant="secondary"
-              className="cursor-pointer capitalize"
+              className="animate-in fade-in slide-in-from-bottom-1 duration-200 cursor-pointer capitalize"
               onClick={() => updateFilter("mealType", "")}
             >
               {filters.mealType}
-              <X className="ml-1 size-3" />
+              <X className="ml-1 size-3 hover:scale-105 transition-transform" />
             </Badge>
           )}
           {filters.favoritesOnly && (
             <Badge
               variant="secondary"
-              className="cursor-pointer"
+              className="animate-in fade-in slide-in-from-bottom-1 duration-200 cursor-pointer"
               onClick={() => updateFilter("favoritesOnly", false)}
             >
               Favorites only
-              <X className="ml-1 size-3" />
+              <X className="ml-1 size-3 hover:scale-105 transition-transform" />
             </Badge>
           )}
         </div>
