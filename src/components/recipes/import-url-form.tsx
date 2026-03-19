@@ -13,6 +13,7 @@ interface ImportUrlFormProps {
 
 export interface ImportedRecipeData {
   name: string;
+  description?: string;
   ingredients: {
     raw_text: string;
     name: string;

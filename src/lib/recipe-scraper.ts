@@ -13,6 +13,7 @@ export interface ScrapedNutrition {
 
 export interface ScrapedRecipe {
   name: string;
+  description: string | null;
   ingredients: string[];
   instructions: string[];
   prepTime: number | null; // minutes
@@ -251,6 +252,7 @@ interface JsonLdNutrition {
 interface JsonLdRecipe {
   "@type"?: string | string[];
   name?: string;
+  description?: string;
   recipeIngredient?: unknown;
   recipeInstructions?: unknown;
   prepTime?: string;
@@ -382,6 +384,10 @@ export function scrapeRecipe(html: string): ScrapedRecipe | null {
   const name = recipe.name?.trim() ?? "";
   if (!name) return null;
 
+  const description = typeof recipe.description === "string"
+    ? recipe.description.slice(0, 120)
+    : null;
+
   const ingredients = parseIngredients(recipe.recipeIngredient as string[] | undefined);
   const instructions = parseInstructions(
     recipe.recipeInstructions as string | string[] | { "@type"?: string; text?: string }[] | undefined
@@ -399,6 +405,7 @@ export function scrapeRecipe(html: string): ScrapedRecipe | null {
 
   return {
     name,
+    description,
     ingredients,
     instructions,
     prepTime,

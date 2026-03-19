@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
     // Return structured recipe data
     return NextResponse.json({
       name: scraped.name,
+      description: scraped.description ?? undefined,
       ingredients: parsedIngredients,
       instructions: scraped.instructions,
       prepTime: scraped.prepTime,
