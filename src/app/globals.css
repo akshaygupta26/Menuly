@@ -98,6 +98,15 @@
   --sidebar-accent-foreground: oklch(0.28 0.03 50);
   --sidebar-border: oklch(0.90 0.015 75);
   --sidebar-ring: oklch(0.58 0.14 40);
+
+  /* Motion tokens */
+  --duration-instant: 100ms;
+  --duration-fast: 200ms;
+  --duration-normal: 300ms;
+  --duration-smooth: 500ms;
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0.0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark {
@@ -155,5 +164,19 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 0ms;
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-smooth: 0ms;
   }
 }
