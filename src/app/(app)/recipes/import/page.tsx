@@ -48,6 +48,7 @@ export default function ImportRecipePage() {
 
     setImportedDefaults({
       name: data.name,
+      description: data.description ?? "",
       instructions: data.instructions.join("\n"),
       prep_time: data.prepTime ?? "",
       cook_time: data.cookTime ?? "",
@@ -121,6 +122,7 @@ export default function ImportRecipePage() {
       const { data, error } = await createRecipe({
         recipe: {
           name: values.name,
+          description: values.description || null,
           cuisine_type: values.cuisine_type || null,
           protein_type: values.protein_type || null,
           meal_type: values.meal_type as MealType[],

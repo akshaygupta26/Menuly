@@ -91,6 +91,7 @@ export default function NewRecipePage() {
       const { data, error } = await createRecipe({
         recipe: {
           name: values.name,
+          description: values.description || null,
           cuisine_type: values.cuisine_type || null,
           protein_type: values.protein_type || null,
           meal_type: values.meal_type as MealType[],

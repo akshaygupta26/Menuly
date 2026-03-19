@@ -70,6 +70,7 @@ export interface Recipe {
   user_id: string;
   household_id: string | null;
   name: string;
+  description: string | null;
   cuisine_type: string | null;
   protein_type: string | null;
   meal_type: MealType[];
