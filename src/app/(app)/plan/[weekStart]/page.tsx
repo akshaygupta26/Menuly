@@ -35,7 +35,7 @@ export default async function MealPlanPage({ params }: MealPlanPageProps) {
   const dateRangeTitle = `${format(monday, "MMM d")} - ${format(sunday, "MMM d, yyyy")}`;
 
   return (
-    <>
+    <div className="animate-page-enter">
       <Header title="Meal Plan" subtitle={dateRangeTitle}>
         <div className="flex items-center gap-1">
           <Button asChild variant="ghost" size="icon-sm">
@@ -62,6 +62,6 @@ export default async function MealPlanPage({ params }: MealPlanPageProps) {
           mealSlots={[...(profile?.meal_slots ?? ["breakfast", "lunch", "dinner"])]}
         />
       )}
-    </>
+    </div>
   );
 }

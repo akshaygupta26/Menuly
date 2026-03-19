@@ -143,7 +143,7 @@ export default function SettingsPage() {
   // ---- Render --------------------------------------------------------------
 
   return (
-    <>
+    <div className="animate-page-enter">
       <Header title="Settings" subtitle="Manage your preferences and account" />
 
       <div className="space-y-6">
@@ -418,6 +418,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   );
 }

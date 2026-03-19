@@ -11,18 +11,18 @@ export default async function GroceryPage() {
 
   if (error) {
     return (
-      <>
+      <div className="animate-page-enter">
         <Header title="Grocery List" />
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
         </div>
-      </>
+      </div>
     );
   }
 
   if (!data) {
     return (
-      <>
+      <div className="animate-page-enter">
         <Header title="Grocery List" />
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="mb-4 rounded-full bg-muted p-4">
@@ -36,17 +36,17 @@ export default async function GroceryPage() {
             <Link href="/plan">Go to Meal Plan</Link>
           </Button>
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="animate-page-enter">
       <Header
         title="Grocery List"
         subtitle={`${data.items.length} item${data.items.length !== 1 ? "s" : ""}`}
       />
       <GroceryListView initialList={data.list} initialItems={data.items} />
-    </>
+    </div>
   );
 }

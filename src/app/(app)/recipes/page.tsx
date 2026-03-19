@@ -9,7 +9,7 @@ export default async function RecipesPage() {
   const { data: recipes, error } = await getRecipes();
 
   return (
-    <>
+    <div className="animate-page-enter">
       <Header title="Recipes" subtitle="All your saved recipes">
         <RecipesHeaderActions />
       </Header>
@@ -25,6 +25,6 @@ export default async function RecipesPage() {
       ) : (
         <RecipeListClient recipes={recipes ?? []} />
       )}
-    </>
+    </div>
   );
 }
