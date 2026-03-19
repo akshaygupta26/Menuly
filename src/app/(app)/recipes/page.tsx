@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/header";
 import { RecipeListClient } from "./recipes-client";
 import { RecipesHeaderActions } from "./recipes-header-actions";
 import { DiscoverSection } from "@/components/recipes/discover-section";
+import { QuickBar } from "@/components/recipes/quick-bar";
 
 export default async function RecipesPage() {
   const { data: recipes, error } = await getRecipes();
@@ -12,6 +13,8 @@ export default async function RecipesPage() {
       <Header title="Recipes" subtitle="All your saved recipes">
         <RecipesHeaderActions />
       </Header>
+
+      <QuickBar />
 
       <DiscoverSection />
 

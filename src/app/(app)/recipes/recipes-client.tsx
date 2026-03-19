@@ -8,6 +8,8 @@ import type { Recipe, MealType } from "@/types/database";
 import { toggleFavorite } from "@/actions/recipes";
 import { matchesSearch } from "@/lib/search";
 import { RecipeCard } from "@/components/recipes/recipe-card";
+import { DraftRecipeCard } from "@/components/recipes/draft-recipe-card";
+import { useRecipeGeneration } from "@/lib/recipe-generation-context";
 import {
   RecipeFiltersBar,
   type RecipeFilters,
@@ -30,6 +32,7 @@ export function RecipeListClient({ recipes: initial }: RecipeListClientProps) {
   const [recipes, setRecipes] = useState(initial);
   const [filters, setFilters] = useState<RecipeFilters>(DEFAULT_FILTERS);
   const [isPending, startTransition] = useTransition();
+  const { drafts } = useRecipeGeneration();
 
   // Client-side filtering
   const filtered = useMemo(() => {
@@ -100,6 +103,15 @@ export function RecipeListClient({ recipes: initial }: RecipeListClientProps) {
         <p className="text-sm text-muted-foreground">
           Showing {filtered.length} of {recipes.length} recipe{recipes.length !== 1 ? "s" : ""}
         </p>
+      )}
+
+      {/* Draft cards pinned to top of grid */}
+      {drafts.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {drafts.map((draft) => (
+            <DraftRecipeCard key={draft.id} draft={draft} />
+          ))}
+        </div>
       )}
 
       {filtered.length === 0 ? (
