@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
-import { ChevronDown, ChevronRight, ListX, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ListX, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
@@ -9,8 +9,8 @@ import {
   addManualItem,
   clearGroceryList,
   removeGroceryItem,
+  toggleGroceryItem,
 } from "@/actions/grocery";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AddItemInput } from "@/components/grocery/add-item-input";
+import { GroceryProgressBar } from "@/components/grocery/grocery-progress-bar";
 import type { GroceryList, GroceryItem, IngredientCategory } from "@/types/database";
 
 // ---------------------------------------------------------------------------
@@ -72,6 +73,7 @@ interface GroceryListViewProps {
 type OptimisticAction =
   | { type: "add"; item: GroceryItem }
   | { type: "remove"; itemId: string }
+  | { type: "toggle"; id: string }
   | { type: "sync"; items: GroceryItem[] };
 
 // ---------------------------------------------------------------------------
@@ -105,6 +107,10 @@ function itemsReducer(items: GroceryItem[], action: OptimisticAction): GroceryIt
       return [...items, action.item];
     case "remove":
       return items.filter((item) => item.id !== action.itemId);
+    case "toggle":
+      return items.map((item) =>
+        item.id === action.id ? { ...item, is_checked: !item.is_checked } : item
+      );
     case "sync":
       return action.items;
     default:
@@ -117,7 +123,7 @@ function itemsReducer(items: GroceryItem[], action: OptimisticAction): GroceryIt
 // ---------------------------------------------------------------------------
 
 export function GroceryListView({ initialList, initialItems }: GroceryListViewProps) {
-  const [items, dispatchOptimistic] = useOptimistic(initialItems, itemsReducer);
+  const [optimisticItems, dispatchOptimistic] = useOptimistic(initialItems, itemsReducer);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<IngredientCategory>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -129,7 +135,6 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
   });
   const [isPending, startTransition] = useTransition();
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
-  const [dismissingIds, setDismissingIds] = useState<Set<string>>(new Set());
   const dismissTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // ---- Realtime subscription ----
@@ -171,8 +176,20 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
   }, [initialList.id, dispatchOptimistic]);
 
   // ---- Derived state ----
-  const grouped = useMemo(() => groupByCategory(items), [items]);
-  const totalCount = items.length;
+  const grouped = useMemo(() => groupByCategory(optimisticItems), [optimisticItems]);
+  const totalCount = optimisticItems.length;
+  const checkedCount = optimisticItems.filter((i) => i.is_checked).length;
+
+  // Auto-collapse categories where all items are checked (merged with user-collapsed set)
+  const effectiveCollapsed = useMemo(() => {
+    const next = new Set(collapsedCategories);
+    for (const [category, items] of grouped.entries()) {
+      if (items.length > 0 && items.every((i) => i.is_checked)) {
+        next.add(category);
+      }
+    }
+    return next;
+  }, [collapsedCategories, grouped]);
 
   // Clean up timers on unmount
   useEffect(() => {
@@ -202,29 +219,35 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
   }, [initialList.id]);
 
   const handleCheck = useCallback(
-    (itemId: string) => {
-      // Start dismissal animation
-      setDismissingIds((prev) => new Set(prev).add(itemId));
+    (item: GroceryItem) => {
+      // Optimistic update immediately
+      startTransition(() => {
+        dispatchOptimistic({ type: "toggle", id: item.id });
+      });
 
-      // After animation, remove the item
-      const timer = setTimeout(() => {
-        setDismissingIds((prev) => {
-          const next = new Set(prev);
-          next.delete(itemId);
-          return next;
-        });
-        dismissTimers.current.delete(itemId);
+      // Show undo toast
+      toast(`✓ ${item.name} ${item.is_checked ? "unchecked" : "checked off"}`, {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            startTransition(() => {
+              dispatchOptimistic({ type: "toggle", id: item.id });
+            });
+            toggleGroceryItem(item.id); // Toggle back on server
+          },
+        },
+        duration: 3000,
+      });
 
-        startTransition(async () => {
-          dispatchOptimistic({ type: "remove", itemId });
-          const result = await removeGroceryItem(itemId);
-          if (result.error) {
-            toast.error("Failed to remove item");
-          }
-        });
-      }, 500);
-
-      dismissTimers.current.set(itemId, timer);
+      // Call server action async (don't await for UI)
+      toggleGroceryItem(item.id).then((result) => {
+        if (result.error) {
+          startTransition(() => {
+            dispatchOptimistic({ type: "toggle", id: item.id }); // revert
+          });
+          toast.error("Failed to update");
+        }
+      });
     },
     [dispatchOptimistic]
   );
@@ -260,7 +283,7 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
       {/* Item count + clear button */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          {totalCount} item{totalCount !== 1 ? "s" : ""} remaining
+          {totalCount} item{totalCount !== 1 ? "s" : ""} total
         </div>
         {totalCount > 0 && (
           <Button
@@ -275,21 +298,32 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
         )}
       </div>
 
+      {/* Progress bar */}
+      {totalCount > 0 && (
+        <GroceryProgressBar checked={checkedCount} total={totalCount} />
+      )}
+
       {/* Category groups */}
       <div className="space-y-4">
         {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((category) => {
           const categoryItems = grouped.get(category)!;
-          const isCollapsed = collapsedCategories.has(category);
+          const isCollapsed = effectiveCollapsed.has(category);
+          const categoryChecked = categoryItems.filter((i) => i.is_checked).length;
+          const allDone = categoryChecked === categoryItems.length && categoryItems.length > 0;
 
           return (
-            <div key={category} className="rounded-lg border">
+            <div key={category} className="rounded-lg border overflow-hidden">
               {/* Category header */}
               <button
                 type="button"
                 onClick={() => toggleCategory(category)}
                 aria-expanded={!isCollapsed}
                 aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${CATEGORY_LABELS[category]}`}
-                className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+                className={`flex w-full items-center gap-2 px-4 py-3 text-left transition-colors ${
+                  allDone
+                    ? "bg-green-50 text-green-700 hover:bg-green-100"
+                    : "hover:bg-muted/50"
+                }`}
               >
                 {isCollapsed ? (
                   <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -298,40 +332,59 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
                 )}
                 <span className="mr-1">{CATEGORY_EMOJI[category]}</span>
                 <span className="font-medium">{CATEGORY_LABELS[category]}</span>
+                {allDone && (
+                  <span className="ml-2 rounded-full bg-green-200 px-2 py-0.5 text-xs font-medium text-green-800">
+                    All done
+                  </span>
+                )}
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {categoryItems.length}
+                  {categoryChecked}/{categoryItems.length}
                 </span>
               </button>
 
-              {/* Category items */}
-              {!isCollapsed && (
-                <div className="border-t px-4 py-2">
-                  <ul className="divide-y">
-                    {categoryItems.map((item) => {
-                      const isDismissing = dismissingIds.has(item.id);
-                      return (
+              {/* Category items — collapse animation via CSS grid */}
+              <div
+                className="grid transition-all"
+                style={{
+                  gridTemplateRows: isCollapsed ? "0fr" : "1fr",
+                  transitionDuration: "var(--duration-smooth)",
+                  transitionTimingFunction: "var(--ease-out)",
+                }}
+              >
+                <div className="overflow-hidden">
+                  <div className="border-t px-4 py-2">
+                    <ul className="divide-y">
+                      {categoryItems.map((item) => (
                         <li
                           key={item.id}
-                          className="flex items-center gap-3 py-2.5 group transition-all duration-500"
-                          style={
-                            isDismissing
-                              ? { opacity: 0, transform: "translateX(20px)" }
-                              : { opacity: 1, transform: "translateX(0)" }
-                          }
+                          className="flex items-center gap-3 py-2.5 group"
                         >
-                          <Checkbox
-                            checked={isDismissing}
-                            onCheckedChange={() => handleCheck(item.id)}
-                            disabled={isDismissing}
-                            aria-label={`Mark ${item.name} as done`}
-                          />
+                          {/* Custom checkbox */}
+                          <button
+                            type="button"
+                            onClick={() => handleCheck(item)}
+                            aria-label={`Mark ${item.name} as ${item.is_checked ? "unchecked" : "done"}`}
+                            className="shrink-0 transition-colors"
+                            style={{ transitionDuration: "var(--duration-fast)" }}
+                          >
+                            {item.is_checked ? (
+                              <div className="flex size-5 items-center justify-center rounded bg-green-500 text-white">
+                                <Check className="size-3.5" strokeWidth={3} />
+                              </div>
+                            ) : (
+                              <div className="size-5 rounded border-2 border-muted-foreground/30" />
+                            )}
+                          </button>
+
                           <div className="flex-1 min-w-0">
                             <span
-                              className={
-                                isDismissing
-                                  ? "line-through text-muted-foreground transition-all duration-300"
-                                  : "text-foreground"
-                              }
+                              className="transition-colors"
+                              style={{
+                                transitionDuration: "var(--duration-fast)",
+                                ...(item.is_checked
+                                  ? { textDecoration: "line-through", color: "hsl(var(--muted-foreground) / 0.5)" }
+                                  : {}),
+                              }}
                             >
                               {item.name}
                             </span>
@@ -356,11 +409,11 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
                             <span className="sr-only">Remove {item.name}</span>
                           </Button>
                         </li>
-                      );
-                    })}
-                  </ul>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           );
         })}
