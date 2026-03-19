@@ -181,6 +181,39 @@
   box-shadow: 0 8px 24px oklch(0 0 0 / 12%);
 }
 
+/* Micro-interactions */
+.interactive-press {
+  transition: transform var(--duration-instant) var(--ease-out);
+}
+.interactive-press:active {
+  transform: scale(0.97);
+}
+
+/* Heart/star favorite bounce */
+@keyframes heart-bounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+.animate-heart-bounce {
+  animation: heart-bounce var(--duration-normal) var(--ease-spring);
+}
+
+/* Page transition: fade + slide up */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-page-enter {
+  animation: page-enter var(--duration-fast) var(--ease-out);
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --duration-instant: 0ms;
