@@ -1,21 +1,13 @@
 "use client";
 
-import Image from "next/image";
+import { useState } from "react";
 import Link from "next/link";
-import { Star, Clock, Users, CalendarDays, Flame } from "lucide-react";
+import { Star } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 import type { Recipe } from "@/types/database";
 import { cn } from "@/lib/utils";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardAction,
-  CardFooter,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { getCuisineGradientStyle } from "@/lib/cuisine-colors";
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -23,113 +15,93 @@ interface RecipeCardProps {
 }
 
 export function RecipeCard({ recipe, onToggleFavorite }: RecipeCardProps) {
+  const [animating, setAnimating] = useState(false);
+
   const totalTime =
     (recipe.prep_time ?? 0) + (recipe.cook_time ?? 0) || null;
 
+  const metadataItems: string[] = [];
+  if (totalTime !== null) metadataItems.push(`${totalTime} min`);
+  if (recipe.servings !== null) metadataItems.push(`${recipe.servings} servings`);
+  if (recipe.calories !== null) metadataItems.push(`${recipe.calories} kcal`);
+
+  function handleFavoriteClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    onToggleFavorite?.(recipe.id);
+    setAnimating(true);
+    setTimeout(() => setAnimating(false), 300);
+  }
+
   return (
-    <Card className="group relative gap-0 overflow-hidden py-0 transition-shadow hover:shadow-md">
-      {/* Recipe image — only shown when an image exists */}
-      {recipe.image_url && (
-        <div className="relative aspect-[16/9] w-full bg-muted">
-          <Image
-            src={recipe.image_url}
-            alt={recipe.name}
-            fill
-            className="object-cover"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          />
-        </div>
-      )}
+    <div className="interactive-lift overflow-hidden rounded-[10px] bg-card text-card-foreground shadow-sm">
+      <Link href={`/recipes/${recipe.id}`} className="block">
+        {/* Image section */}
+        <div className="relative aspect-[16/9]">
+          {recipe.image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={recipe.image_url}
+              alt={recipe.name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div
+              className="h-full w-full"
+              style={{ background: getCuisineGradientStyle(recipe.cuisine_type ?? null) }}
+            />
+          )}
 
-      <CardHeader className={cn("gap-1.5 px-4 pb-0", recipe.image_url ? "pt-3" : "pt-4")}>
-        <CardTitle className="line-clamp-2">
-          <Link
-            href={`/recipes/${recipe.id}`}
-            className="after:absolute after:inset-0"
-          >
-            {recipe.name}
-          </Link>
-        </CardTitle>
-
-        <CardAction>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="relative z-10 size-9 min-h-[36px] min-w-[36px]"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onToggleFavorite?.(recipe.id);
-            }}
-            aria-label={
-              recipe.is_favorite
-                ? "Remove from favorites"
-                : "Add to favorites"
-            }
+          {/* Favorite button */}
+          <button
+            type="button"
+            className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm transition-colors hover:bg-white"
+            onClick={handleFavoriteClick}
+            aria-label={recipe.is_favorite ? "Remove from favorites" : "Add to favorites"}
           >
             <Star
               className={cn(
                 "size-4 transition-colors",
                 recipe.is_favorite
-                  ? "fill-amber-400 text-amber-400"
-                  : "text-muted-foreground"
+                  ? "fill-yellow-400 text-yellow-400"
+                  : "text-muted-foreground",
+                animating && "animate-heart-bounce"
               )}
             />
-          </Button>
-        </CardAction>
+          </button>
 
-        <div className="flex flex-wrap gap-1.5">
-          {recipe.cuisine_type && recipe.cuisine_type !== "other" && (
-            <Badge variant="secondary">{recipe.cuisine_type}</Badge>
+          {/* Last made pill */}
+          {recipe.last_made_date && (
+            <span className="absolute bottom-2 left-2 rounded-full bg-black/50 px-2 py-0.5 text-xs text-white">
+              {formatDistanceToNow(new Date(recipe.last_made_date), {
+                addSuffix: true,
+              })}
+            </span>
           )}
-          {recipe.protein_type && recipe.protein_type !== "other" && (
-            <Badge variant="outline">{recipe.protein_type}</Badge>
-          )}
-          {recipe.meal_type.map((meal) => (
-            <Badge key={meal} variant="ghost" className="capitalize">
-              {meal}
-            </Badge>
-          ))}
         </div>
-      </CardHeader>
 
-      <CardFooter className="flex-wrap gap-x-4 gap-y-1 px-4 pb-4 text-muted-foreground text-xs">
-        {totalTime !== null && (
-          <span className="inline-flex items-center gap-1">
-            <Clock className="size-3.5" />
-            {totalTime} min
-          </span>
-        )}
+        {/* Content section */}
+        <div className="p-4">
+          <p className="font-semibold text-base leading-tight">{recipe.name}</p>
 
-        {recipe.servings !== null && (
-          <span className="inline-flex items-center gap-1">
-            <Users className="size-3.5" />
-            {recipe.servings} servings
-          </span>
-        )}
+          {recipe.description && (
+            <p className="mt-1 line-clamp-1 text-sm italic text-muted-foreground">
+              {recipe.description}
+            </p>
+          )}
 
-        {recipe.calories !== null && (
-          <span className="inline-flex items-center gap-1">
-            <Flame className="size-3.5" />
-            {recipe.calories} kcal
-          </span>
-        )}
-
-        {recipe.protein_g !== null && (
-          <span className="inline-flex items-center gap-1 font-medium">
-            P {recipe.protein_g}g
-          </span>
-        )}
-
-        {recipe.last_made_date && (
-          <span className="ml-auto inline-flex items-center gap-1">
-            <CalendarDays className="size-3.5" />
-            {formatDistanceToNow(new Date(recipe.last_made_date), {
-              addSuffix: true,
-            })}
-          </span>
-        )}
-      </CardFooter>
-    </Card>
+          {metadataItems.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5 border-t pt-3 text-xs text-muted-foreground">
+              {metadataItems.map((item, i) => (
+                <span key={item} className="inline-flex items-center gap-1">
+                  {i > 0 && <span className="text-muted-foreground/50">·</span>}
+                  {item}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </Link>
+    </div>
   );
 }

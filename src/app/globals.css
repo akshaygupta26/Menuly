@@ -172,6 +172,15 @@
   100% { background-position: 200% 0; }
 }
 
+.interactive-lift {
+  transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) var(--ease-spring);
+}
+
+.interactive-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px oklch(0 0 0 / 12%);
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --duration-instant: 0ms;
