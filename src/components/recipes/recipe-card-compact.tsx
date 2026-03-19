@@ -64,7 +64,7 @@ export function RecipeCardCompact({ recipe, onToggleFavorite }: RecipeCardCompac
       {onToggleFavorite && (
         <button
           onClick={() => onToggleFavorite(recipe.id)}
-          className="shrink-0 p-1 transition-transform duration-[var(--duration-fast)] active:scale-[0.9]"
+          className="shrink-0 p-1 transition-transform duration-[var(--duration-fast)] active:scale-[0.9] interactive-press"
         >
           <Star
             className={`h-4 w-4 ${recipe.is_favorite ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}

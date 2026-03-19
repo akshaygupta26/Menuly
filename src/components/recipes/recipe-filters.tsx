@@ -160,7 +160,7 @@ export function RecipeFiltersBar({ filters, onChange, viewMode, onViewModeChange
             updateFilter("cuisineType", v === "__all__" ? "" : v)
           }
         >
-          <SelectTrigger size="sm" className={cn("w-[150px]", filters.cuisineType && "border-primary/50 bg-primary/5")}>
+          <SelectTrigger size="sm" className={cn("w-[150px] interactive-press", filters.cuisineType && "border-primary/50 bg-primary/5")}>
             <SelectValue placeholder="Cuisine" />
           </SelectTrigger>
           <SelectContent>
@@ -179,7 +179,7 @@ export function RecipeFiltersBar({ filters, onChange, viewMode, onViewModeChange
             updateFilter("proteinType", v === "__all__" ? "" : v)
           }
         >
-          <SelectTrigger size="sm" className={cn("w-[150px]", filters.proteinType && "border-primary/50 bg-primary/5")}>
+          <SelectTrigger size="sm" className={cn("w-[150px] interactive-press", filters.proteinType && "border-primary/50 bg-primary/5")}>
             <SelectValue placeholder="Protein" />
           </SelectTrigger>
           <SelectContent>
@@ -198,7 +198,7 @@ export function RecipeFiltersBar({ filters, onChange, viewMode, onViewModeChange
             updateFilter("mealType", v === "__all__" ? "" : v)
           }
         >
-          <SelectTrigger size="sm" className={cn("w-[140px]", filters.mealType && "border-primary/50 bg-primary/5")}>
+          <SelectTrigger size="sm" className={cn("w-[140px] interactive-press", filters.mealType && "border-primary/50 bg-primary/5")}>
             <SelectValue placeholder="Meal type" />
           </SelectTrigger>
           <SelectContent>

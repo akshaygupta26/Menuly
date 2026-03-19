@@ -622,7 +622,7 @@ export function RecipeForm({
 
       {/* Submit */}
       <div className="flex justify-end">
-        <Button type="submit" disabled={isLoading}>
+        <Button type="submit" disabled={isLoading} className="interactive-press">
           {isLoading ? "Saving..." : "Save Recipe"}
         </Button>
       </div>

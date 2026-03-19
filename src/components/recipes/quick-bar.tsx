@@ -70,7 +70,7 @@ export function QuickBar() {
             size="sm"
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="shrink-0"
+            className="shrink-0 interactive-press"
           >
             {sent ? "Sent!" : "Generate"}
           </Button>

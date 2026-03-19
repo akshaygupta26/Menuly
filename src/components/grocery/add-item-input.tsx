@@ -78,7 +78,7 @@ export function AddItemInput({ onAdd }: AddItemInputProps) {
           ))}
         </SelectContent>
       </Select>
-      <Button type="submit" size="sm" disabled={!name.trim()}>
+      <Button type="submit" size="sm" disabled={!name.trim()} className="interactive-press">
         <Plus className="size-4" />
         Add
       </Button>
