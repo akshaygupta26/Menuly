@@ -113,7 +113,7 @@ export default async function RecipeDetailPage({
 
   return (
     <>
-      <Header title={recipe.name}>
+      <Header title={recipe.name} titleStyle={{ viewTransitionName: "recipe-title" }}>
         <Button asChild variant="ghost" size="sm">
           <Link href="/recipes">
             <ArrowLeft className="size-4" />
@@ -125,7 +125,7 @@ export default async function RecipeDetailPage({
       <div className="space-y-8">
         {/* Hero image */}
         {recipe.image_url && (
-          <div className="relative aspect-[2/1] w-full overflow-hidden rounded-lg bg-muted">
+          <div className="relative aspect-[2/1] w-full overflow-hidden rounded-lg bg-muted" style={{ viewTransitionName: "recipe-image" }}>
             <Image
               src={recipe.image_url}
               alt={recipe.name}

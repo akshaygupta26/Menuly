@@ -222,3 +222,12 @@
     --duration-smooth: 0ms;
   }
 }
+
+/* View Transitions API — scope to recipe transitions */
+::view-transition-old(recipe-image),
+::view-transition-new(recipe-image),
+::view-transition-old(recipe-title),
+::view-transition-new(recipe-title) {
+  animation-duration: var(--duration-normal);
+  animation-timing-function: var(--ease-in-out);
+}

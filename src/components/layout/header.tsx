@@ -1,14 +1,17 @@
+import type { CSSProperties } from "react";
+
 interface HeaderProps {
   title: string;
   subtitle?: string;
+  titleStyle?: CSSProperties;
   children?: React.ReactNode;
 }
 
-export function Header({ title, subtitle, children }: HeaderProps) {
+export function Header({ title, subtitle, titleStyle, children }: HeaderProps) {
   return (
     <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:items-start sm:justify-between sm:gap-4">
       <div className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground" style={titleStyle}>
           {title}
         </h1>
         {subtitle && (

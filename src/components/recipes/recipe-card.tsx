@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Star } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 import type { Recipe } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { getCuisineGradientStyle } from "@/lib/cuisine-colors";
+import { navigateWithTransition } from "@/lib/view-transitions";
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -16,6 +18,7 @@ interface RecipeCardProps {
 
 export function RecipeCard({ recipe, onToggleFavorite }: RecipeCardProps) {
   const [animating, setAnimating] = useState(false);
+  const router = useRouter();
 
   const totalTime =
     (recipe.prep_time ?? 0) + (recipe.cook_time ?? 0) || null;
@@ -35,9 +38,18 @@ export function RecipeCard({ recipe, onToggleFavorite }: RecipeCardProps) {
 
   return (
     <div className="interactive-lift overflow-hidden rounded-[10px] bg-card text-card-foreground shadow-sm">
-      <Link href={`/recipes/${recipe.id}`} className="block">
+      <Link
+        href={`/recipes/${recipe.id}`}
+        className="block"
+        onClick={(e) => {
+          if (typeof document !== "undefined" && "startViewTransition" in document) {
+            e.preventDefault();
+            navigateWithTransition(`/recipes/${recipe.id}`, router);
+          }
+        }}
+      >
         {/* Image section */}
-        <div className="relative aspect-[16/9]">
+        <div className="relative aspect-[16/9]" style={{ viewTransitionName: "recipe-image" }}>
           {recipe.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -82,7 +94,7 @@ export function RecipeCard({ recipe, onToggleFavorite }: RecipeCardProps) {
 
         {/* Content section */}
         <div className="p-4">
-          <p className="font-semibold text-base leading-tight">{recipe.name}</p>
+          <p className="font-semibold text-base leading-tight" style={{ viewTransitionName: "recipe-title" }}>{recipe.name}</p>
 
           {recipe.description && (
             <p className="mt-1 line-clamp-1 text-sm italic text-muted-foreground">
