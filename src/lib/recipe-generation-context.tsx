@@ -146,15 +146,18 @@ export function RecipeGenerationProvider({ children }: { children: ReactNode }) 
 
             try {
               const json = JSON.parse(raw) as {
-                event?: string;
+                done?: boolean;
+                token?: string;
                 data?: Partial<RecipeFormValues>;
-                name?: string;
                 error?: string;
                 remaining?: number | null;
               };
 
-              if (json.event === "done" && json.data) {
-                const recipeName = json.name ?? json.data.name ?? "Recipe";
+              // Skip token-only events (streaming progress)
+              if (json.token) continue;
+
+              if (json.done && json.data) {
+                const recipeName = json.data.name ?? "Recipe";
 
                 setDrafts((prev) =>
                   prev.map((d) =>
@@ -176,7 +179,7 @@ export function RecipeGenerationProvider({ children }: { children: ReactNode }) 
                 if (json.remaining !== null && json.remaining !== undefined) {
                   toast.info(`${json.remaining} AI generation(s) remaining today`);
                 }
-              } else if (json.event === "error" || json.error) {
+              } else if (json.error) {
                 throw new Error(json.error ?? "Generation failed");
               }
             } catch {
