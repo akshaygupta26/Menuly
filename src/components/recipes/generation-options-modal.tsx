@@ -41,6 +41,18 @@ const DIETARY_OPTIONS = [
   { value: "low-carb", label: "Low-Carb" },
 ];
 
+const ALLERGY_OPTIONS = [
+  { value: "peanuts", label: "Peanuts" },
+  { value: "tree nuts", label: "Tree Nuts" },
+  { value: "dairy", label: "Dairy" },
+  { value: "eggs", label: "Eggs" },
+  { value: "wheat", label: "Wheat" },
+  { value: "soy", label: "Soy" },
+  { value: "fish", label: "Fish" },
+  { value: "shellfish", label: "Shellfish" },
+  { value: "sesame", label: "Sesame" },
+];
+
 interface GenerationOptionsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -65,13 +77,21 @@ function GenerationOptionsForm({
   const [prompt, setPrompt] = useState(initialPrompt);
   const [cuisine, setCuisine] = useState<string>("");
   const [dietary, setDietary] = useState<string>("");
+  const [allergies, setAllergies] = useState<string[]>([]);
   const [servings, setServings] = useState<string>("");
+
+  function toggleAllergy(value: string) {
+    setAllergies((prev) =>
+      prev.includes(value) ? prev.filter((a) => a !== value) : [...prev, value]
+    );
+  }
 
   function buildFullPrompt(): string {
     const parts: string[] = [];
     if (prompt.trim()) parts.push(prompt.trim());
     if (cuisine) parts.push(`${cuisine} cuisine`);
     if (dietary) parts.push(dietary);
+    if (allergies.length > 0) parts.push(`no ${allergies.join(", no ")}`);
     if (servings) parts.push(`${servings} servings`);
     return parts.join(", ");
   }
@@ -139,6 +159,30 @@ function GenerationOptionsForm({
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Allergies */}
+      <div className="flex flex-col gap-1.5">
+        <Label>Allergies (optional)</Label>
+        <div className="flex flex-wrap gap-1.5">
+          {ALLERGY_OPTIONS.map((opt) => {
+            const active = allergies.includes(opt.value);
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => toggleAllergy(opt.value)}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors duration-[var(--duration-instant)] ${
+                  active
+                    ? "bg-destructive/10 text-destructive ring-1 ring-destructive/30"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {active && "✕ "}{opt.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Servings */}
