@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -19,6 +19,18 @@ import type { IngredientCategory, MealType } from "@/types/database";
 export default function NewRecipePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+
+  // Read AI-generated recipe from sessionStorage (set by DraftRecipeCard)
+  const aiDefaults = useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem("ai-generated-recipe");
+      if (!raw) return undefined;
+      sessionStorage.removeItem("ai-generated-recipe");
+      return JSON.parse(raw) as Partial<RecipeFormValues>;
+    } catch {
+      return undefined;
+    }
+  }, []);
 
   async function handleSubmit(values: RecipeFormValues) {
     setIsLoading(true);
@@ -113,8 +125,10 @@ export default function NewRecipePage() {
       </Header>
 
       <RecipeForm
+        key={aiDefaults ? "ai" : "blank"}
         onSubmit={handleSubmit}
         isLoading={isLoading}
+        defaultValues={aiDefaults}
       />
     </>
   );
