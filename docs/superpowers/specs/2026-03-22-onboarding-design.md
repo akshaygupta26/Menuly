@@ -331,4 +331,4 @@ Add two new sections to the Settings page:
 - **Spotlight target doesn't exist:** Silently skip that spotlight step. If all targets missing, skip the tour entirely (banner still shows).
 - **Household member joins:** Onboarding is per-user, not per-household. Each member gets their own onboarding flow.
 - **Page visited via deep link:** Contextual guidance still triggers — it's based on `onboarding_page_visits`, not navigation order.
-- **Cookie cleared/expired:** Falls back to DB check in middleware, re-sets cookie.
+- **Cookie cleared/expired:** Falls back to the layout-level DB check via `getProfile()`. The cookie is not automatically re-set — the layout check runs on each page load until the user replays onboarding (which re-sets the cookie on completion). This is a minor performance trade-off, not a functional issue.
