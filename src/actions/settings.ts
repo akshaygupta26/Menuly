@@ -116,3 +116,41 @@ export async function updateMealSlots(
 
   return { data: null, error: null };
 }
+
+export async function updateDietaryPreferences(
+  preferences: string[]
+): Promise<ActionResult> {
+  const { supabase, user } = await getAuthenticatedUser();
+  if (!supabase || !user) return { data: null, error: "Not authenticated" };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      dietary_preferences: preferences,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", user.id);
+
+  if (error) return { data: null, error: error.message };
+  revalidatePath("/settings");
+  return { data: null, error: null };
+}
+
+export async function updateAllergies(
+  allergies: string[]
+): Promise<ActionResult> {
+  const { supabase, user } = await getAuthenticatedUser();
+  if (!supabase || !user) return { data: null, error: "Not authenticated" };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      allergies: allergies,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", user.id);
+
+  if (error) return { data: null, error: error.message };
+  revalidatePath("/settings");
+  return { data: null, error: null };
+}
