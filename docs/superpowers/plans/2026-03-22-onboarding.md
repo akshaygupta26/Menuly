@@ -179,9 +179,22 @@ git commit -m "feat: add onboarding DB migration and types"
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { getAuthenticatedUser } from "./auth";
-import type { ActionResult } from "@/types/database";
+import { createClient } from "@/lib/supabase/server";
 import type { OnboardingPage, DietaryPreference, Allergy } from "@/types/onboarding";
+
+type ActionResult<T = null> =
+  | { data: T; error: null }
+  | { data: null; error: string };
+
+async function getAuthenticatedUser() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error || !user) return { supabase: null, user: null };
+  return { supabase, user };
+}
 
 const ONBOARDING_COOKIE = "menuly_onboarding_completed";
 const COOKIE_MAX_AGE = 31536000; // 1 year
@@ -728,7 +741,7 @@ export function useOnboarding() {
 // src/hooks/use-spotlight.ts
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 interface SpotlightStep {
   target: string;
@@ -748,21 +761,34 @@ export function useSpotlight(steps: SpotlightStep[]) {
   const [targetRect, setTargetRect] = useState<SpotlightPosition | null>(null);
   const [visible, setVisible] = useState(false);
   const rafRef = useRef<number>();
+  // Ref to avoid stale closures and infinite loops from steps array identity changes
+  const stepsRef = useRef(steps);
+  stepsRef.current = steps;
 
   const isActive = currentStep >= 0;
   const activeStepData = isActive ? steps[currentStep] : null;
 
-  const updatePosition = useCallback(() => {
-    if (!activeStepData) return;
-    const el = document.querySelector(`[data-onboarding="${activeStepData.target}"]`);
-    if (!el) {
-      // Skip to next step if target doesn't exist
-      setCurrentStep((prev) => {
-        const next = prev + 1;
-        return next < steps.length ? next : -1;
-      });
+  // Skip missing targets: separate effect that only depends on currentStep
+  useEffect(() => {
+    if (currentStep < 0) return;
+    const step = stepsRef.current[currentStep];
+    if (!step) {
+      setCurrentStep(-1);
       return;
     }
+    const el = document.querySelector(`[data-onboarding="${step.target}"]`);
+    if (!el) {
+      // Skip to next step if target doesn't exist
+      const next = currentStep + 1;
+      setCurrentStep(next < stepsRef.current.length ? next : -1);
+    }
+  }, [currentStep]);
+
+  const updatePosition = useCallback(() => {
+    const step = stepsRef.current[stepsRef.current.length > 0 ? Math.max(0, currentStep) : 0];
+    if (!step || currentStep < 0) return;
+    const el = document.querySelector(`[data-onboarding="${step.target}"]`);
+    if (!el) return;
     const rect = el.getBoundingClientRect();
     setTargetRect({
       top: rect.top + window.scrollY,
@@ -775,7 +801,7 @@ export function useSpotlight(steps: SpotlightStep[]) {
     if (rect.top < 0 || rect.bottom > window.innerHeight) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [activeStepData, steps.length]);
+  }, [currentStep]);
 
   useEffect(() => {
     if (!isActive) {
@@ -809,10 +835,10 @@ export function useSpotlight(steps: SpotlightStep[]) {
     setTimeout(() => {
       setCurrentStep((prev) => {
         const nextStep = prev + 1;
-        return nextStep < steps.length ? nextStep : -1;
+        return nextStep < stepsRef.current.length ? nextStep : -1;
       });
     }, 150);
-  }, [steps.length]);
+  }, []);
 
   const skip = useCallback(() => {
     setVisible(false);
@@ -822,17 +848,20 @@ export function useSpotlight(steps: SpotlightStep[]) {
   const totalSteps = steps.length;
   const stepNumber = currentStep + 1;
 
-  return {
-    isActive,
-    visible,
-    targetRect,
-    activeStep: activeStepData,
-    stepNumber,
-    totalSteps,
-    start,
-    next,
-    skip,
-  };
+  return useMemo(
+    () => ({
+      isActive,
+      visible,
+      targetRect,
+      activeStep: activeStepData,
+      stepNumber,
+      totalSteps,
+      start,
+      next,
+      skip,
+    }),
+    [isActive, visible, targetRect, activeStepData, stepNumber, totalSteps, start, next, skip]
+  );
 }
 ```
 
@@ -1049,6 +1078,7 @@ export function PageGuide({ page }: PageGuideProps) {
   const config = ONBOARDING_CONFIG[page];
   const [showBanner, setShowBanner] = useState(false);
   const spotlight = useSpotlight(config.spotlights);
+  const { start: startSpotlight } = spotlight;
 
   // Show banner on first visit
   useEffect(() => {
@@ -1061,16 +1091,18 @@ export function PageGuide({ page }: PageGuideProps) {
   useEffect(() => {
     if (activeGuide === page) {
       setShowBanner(true);
-      spotlight.start();
+      startSpotlight();
     }
-  }, [activeGuide, page, spotlight]);
+  }, [activeGuide, page, startSpotlight]);
 
   const handleDismissBanner = () => {
+    // Capture first-visit state before marking as visited
+    const wasFirstVisit = !isPageVisited(page);
     setShowBanner(false);
     markPageVisited(page);
     // Start spotlights after banner dismissal (first visit only)
-    if (!isPageVisited(page)) {
-      setTimeout(() => spotlight.start(), 300);
+    if (wasFirstVisit) {
+      setTimeout(() => startSpotlight(), 300);
     }
   };
 
@@ -1081,11 +1113,6 @@ export function PageGuide({ page }: PageGuideProps) {
 
   return (
     <>
-      {/* Help icon — rendered by the page in its header via children or a portal */}
-      <div className="page-guide-help-icon">
-        <HelpIcon onClick={handleShowGuide} />
-      </div>
-
       {/* Banner */}
       {showBanner && (
         <PageGuideBanner
@@ -1109,9 +1136,30 @@ export function PageGuide({ page }: PageGuideProps) {
     </>
   );
 }
+
+/**
+ * Separate component for the help icon — pages render this inside their <Header> children.
+ * Must be used inside a component that is a descendant of OnboardingProvider.
+ */
+export function PageGuideHelpIcon({ page }: { page: OnboardingPage }) {
+  const { showGuide } = useOnboarding();
+  return <HelpIcon onClick={() => showGuide(page)} />;
+}
 ```
 
 Write to `src/components/onboarding/page-guide.tsx`.
+
+**Usage pattern in pages:**
+```tsx
+// Each page renders the HelpIcon inside its Header's children slot:
+<Header title="Recipes">
+  <PageGuideHelpIcon page="recipes" />
+  <Button>+ Add Recipe</Button>
+</Header>
+<PageGuide page="recipes" />
+```
+
+The `PageGuideHelpIcon` is a small `"use client"` component that can be placed in the Header's `children` prop alongside other action buttons. The `PageGuide` component (banner + spotlights) goes below the Header in the page content area.
 
 - [ ] **Step 7: Verify types compile**
 
@@ -1406,13 +1454,11 @@ interface StepFirstRecipeProps {
     dietary_preferences?: string[];
     allergies?: string[];
   };
-  onComplete: () => void;
   onSkip: () => void;
 }
 
 export function StepFirstRecipe({
   preferences,
-  onComplete,
   onSkip,
 }: StepFirstRecipeProps) {
   const [url, setUrl] = useState("");
@@ -1598,7 +1644,6 @@ export default function OnboardingPage() {
       {step === 2 && (
         <StepFirstRecipe
           preferences={preferencesRef.current}
-          onComplete={finishOnboarding}
           onSkip={finishOnboarding}
         />
       )}
@@ -1632,15 +1677,32 @@ git commit -m "feat: add 3-step onboarding welcome flow"
 - Modify: `src/app/(app)/grocery/page.tsx`
 - Modify: `src/app/(app)/settings/page.tsx`
 
-For each page, two changes are needed:
-1. Import and render `<PageGuide page="pagename" />` near the top of the JSX
-2. Add `data-onboarding="target-name"` attributes to key elements matching the config
+For each page, three changes are needed:
+1. Import and render `<PageGuideHelpIcon page="pagename" />` inside the `<Header>` children (right side, next to action buttons)
+2. Import and render `<PageGuide page="pagename" />` below the Header, at the top of the page content
+3. Add `data-onboarding="target-name"` attributes to key elements matching the config
+
+Both `PageGuide` and `PageGuideHelpIcon` are `"use client"` components — they can be rendered inside async server component pages.
+
+**Pattern for each page:**
+```tsx
+import { PageGuide, PageGuideHelpIcon } from "@/components/onboarding/page-guide";
+
+// In the JSX:
+<Header title="Page Title">
+  <PageGuideHelpIcon page="pagename" />
+  {/* ...existing action buttons... */}
+</Header>
+<PageGuide page="pagename" />
+{/* ...rest of page content... */}
+```
 
 - [ ] **Step 1: Add PageGuide to Dashboard**
 
 In `src/app/(app)/page.tsx`:
-- Import `PageGuide` from `@/components/onboarding/page-guide`
-- Add `<PageGuide page="dashboard" />` as the first child in the returned JSX
+- Import `PageGuide` and `PageGuideHelpIcon` from `@/components/onboarding/page-guide`
+- Add `<PageGuideHelpIcon page="dashboard" />` inside the Header's children
+- Add `<PageGuide page="dashboard" />` below the Header
 - Add `data-onboarding="quick-actions"` to the Quick Actions container div
 - Add `data-onboarding="plan-card"` to the This Week's Plan card
 - Add `data-onboarding="recipe-card"` to the Recipe Collection card
@@ -1650,7 +1712,7 @@ The exact element selectors depend on the JSX structure found. Look for the wrap
 - [ ] **Step 2: Add PageGuide to Recipes**
 
 In `src/app/(app)/recipes/page.tsx`:
-- Import and add `<PageGuide page="recipes" />`
+- Add `<PageGuideHelpIcon page="recipes" />` in the Header and `<PageGuide page="recipes" />` below it
 - Add `data-onboarding="add-recipe"` to the Add Recipe button
 - Add `data-onboarding="search-filter"` to the search/filter bar
 - Add `data-onboarding="favorite-toggle"` to the first recipe card's favorite button (if recipe cards exist — the spotlight will skip if no cards)
