@@ -45,11 +45,27 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // If user is logged in and trying to access login page
-  if (user && request.nextUrl.pathname.startsWith("/login")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
+  // If user is logged in, handle /onboarding and /login redirects
+  if (user) {
+    const path = request.nextUrl.pathname;
+
+    // If authenticated user is on /onboarding with completed cookie, redirect to home
+    if (path === "/onboarding") {
+      const onboardingCookie = request.cookies.get("menuly_onboarding_completed");
+      if (onboardingCookie?.value === "true") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/";
+        return NextResponse.redirect(url);
+      }
+      return supabaseResponse;
+    }
+
+    // Redirect authenticated users from /login to /
+    if (path.startsWith("/login")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;
