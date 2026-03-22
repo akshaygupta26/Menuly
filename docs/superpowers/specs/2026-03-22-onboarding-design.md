@@ -48,7 +48,7 @@ Both layers are replayable: a "Replay Onboarding" button in Settings resets ever
 **Step 3: Import Your First Recipe**
 - URL input field with "Import" button (primary action)
 - "or" divider
-- Alternative actions: "Generate with AI" button, "Create Manually" button
+- Alternative actions: "Generate with AI" button (navigates to `/recipes/new` and triggers the AI generation modal via `RecipeGenerationProvider`), "Create Manually" button (navigates to `/recipes/new`)
 - Soft skip link: "I'll do this later →"
 - On successful import: show brief success state, then proceed
 
@@ -74,8 +74,9 @@ Both layers are replayable: a "Replay Onboarding" button in Settings resets ever
 
 **2. Tooltip Spotlights**
 - Triggered after the banner is shown (or when "Show me around" is tapped)
-- Dimmed overlay with a cutout around the highlighted element
+- Dimmed overlay with a cutout around the highlighted element, 150ms fade-in transition
 - Tooltip with: title, description, step counter ("1 of 3"), Next/Skip buttons
+- Smooth 150ms crossfade transition between spotlight steps
 - 2-3 spotlights per page, stepping through sequentially
 - If a target element doesn't exist on the page, that step is silently skipped
 
@@ -128,7 +129,7 @@ Both layers are replayable: a "Replay Onboarding" button in Settings resets ever
 
 ### Database Changes
 
-New columns on the `profiles` table (new migration `005_onboarding.sql`):
+New columns on the `profiles` table (new migration `010_onboarding.sql`):
 
 ```sql
 ALTER TABLE profiles
@@ -138,16 +139,24 @@ ALTER TABLE profiles
   ADD COLUMN allergies TEXT[] NOT NULL DEFAULT '{}';
 ```
 
+Note: The profile auto-creation in `getProfile()` (`src/actions/settings.ts`) does not need modification since all new columns have database-level `NOT NULL DEFAULT` values.
+
 ### Types Update (`src/types/database.ts`)
 
 ```ts
 // Add to Profile type
 onboarding_completed: boolean;
-onboarding_page_visits: Record<string, boolean>;
-dietary_preferences: string[];
-allergies: string[];
+onboarding_page_visits: Record<OnboardingPage, boolean>;
+dietary_preferences: DietaryPreference[];
+allergies: Allergy[];
 
-// New constants
+// New types and constants
+type OnboardingPage = "dashboard" | "recipes" | "plan" | "grocery" | "settings";
+
+const ONBOARDING_PAGES: OnboardingPage[] = [
+  "dashboard", "recipes", "plan", "grocery", "settings"
+];
+
 const DIETARY_PREFERENCES = [
   "vegetarian", "vegan", "pescatarian", "keto", "paleo",
   "gluten-free", "dairy-free", "low-carb", "mediterranean", "halal", "kosher"
@@ -166,21 +175,25 @@ type Allergy = typeof ALLERGIES[number];
 
 ## Routing & Middleware
 
-### Middleware Changes (`src/middleware.ts`)
+### Onboarding Redirect Strategy
 
-Extended flow:
+**Primary check:** The `(app)/layout.tsx` server component checks `onboarding_completed` via the existing `getProfile()` server action. If `false`, it calls `redirect("/onboarding")`. This reuses existing Supabase client patterns and avoids adding DB queries to middleware.
+
+**Cookie fast-path in middleware:** To avoid the layout-level check on every page load, a `menuly_onboarding_completed=true` cookie acts as a fast-path. When present, middleware skips the check entirely. When absent, the layout check runs and sets the cookie on completion.
+
+Middleware flow:
 
 1. Not authenticated → redirect `/login` (unchanged)
 2. Authenticated + on `/login` → redirect `/` (unchanged)
-3. Authenticated + `onboarding_completed` cookie is absent → check profile in DB:
-   - If `onboarding_completed === false` and NOT on `/onboarding` → redirect `/onboarding`
-   - If `onboarding_completed === true` → set cookie, continue
-4. Authenticated + on `/onboarding` + cookie says completed → redirect `/`
+3. Authenticated + on `/onboarding` + `menuly_onboarding_completed` cookie present → redirect `/`
+4. All other authenticated requests → pass through (layout handles onboarding redirect if needed)
 
-**Cookie caching:** After the first DB check, a `menuly_onboarding_completed=true` cookie is set to avoid repeated DB queries. The cookie is:
-- Set when onboarding completes or when DB confirms it's already done
+**Cookie details:**
+- Set when `completeOnboarding` server action runs, and when layout confirms `onboarding_completed === true`
 - Cleared when "Replay Onboarding" resets the flag
-- HttpOnly, SameSite=Lax, path=/
+- HttpOnly, SameSite=Lax, path=/, maxAge=31536000 (1 year)
+
+**Note on auth callback:** After signup, the callback route redirects to `/`. The layout then detects `onboarding_completed === false` and redirects to `/onboarding`. This results in a brief double-redirect on first signup only — acceptable since the cookie prevents it from recurring.
 
 ### Route Setup
 
@@ -190,7 +203,7 @@ src/app/(auth)/onboarding/
   layout.tsx        — Minimal layout (no app shell)
 ```
 
-The `/onboarding` route is in the `(auth)` group so it doesn't get the app shell sidebar/nav, but middleware still requires authentication.
+The `/onboarding` route is in the `(auth)` route group for layout purposes (no app shell sidebar/nav). In middleware, `/onboarding` is treated as a special case: it requires authentication (like all app routes) but is NOT redirected away like `/login`. The middleware must explicitly handle `/onboarding` — the existing "auth user on /login → redirect /" logic must not apply to it. Add `/onboarding` to the middleware's path handling alongside `/login` and `/callback`.
 
 ---
 
@@ -251,6 +264,28 @@ Wraps the app layout (inside `src/app/(app)/layout.tsx`). On mount:
 2. Provides context: `{ pageVisits, markPageVisited, showGuide, isGuideActive }`
 3. Each page checks context to decide whether to show banner + spotlights
 4. State cached in context — no repeated DB calls per page navigation
+
+### Server/Client Component Integration
+
+The Dashboard and other pages are async server components, which cannot use React context. Each page renders a `<PageGuide page="dashboard" />` client component within its JSX. `PageGuide` is a `"use client"` component that:
+1. Consumes the `OnboardingProvider` context
+2. Looks up the banner and spotlight config for the given page
+3. Renders the `PageGuideBanner` and `SpotlightTour` components
+4. Handles the "Show me around" help icon
+
+Pattern:
+```tsx
+// In a server component page (e.g., src/app/(app)/page.tsx)
+export default async function DashboardPage() {
+  // ...server data fetching...
+  return (
+    <>
+      <PageGuide page="dashboard" />
+      {/* ...rest of page content... */}
+    </>
+  );
+}
+```
 
 ---
 
