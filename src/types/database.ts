@@ -1,3 +1,5 @@
+import type { OnboardingPage, DietaryPreference, Allergy } from "./onboarding";
+
 export type NutritionSource = "json_ld" | "usda" | "manual";
 export type HouseholdRole = "owner" | "member";
 
@@ -61,6 +63,10 @@ export interface Profile {
   ai_generation_count: number;
   ai_generation_reset_at: string;
   ai_unlimited: boolean;
+  onboarding_completed: boolean;
+  onboarding_page_visits: Partial<Record<OnboardingPage, boolean>>;
+  dietary_preferences: DietaryPreference[];
+  allergies: Allergy[];
   created_at: string;
   updated_at: string;
 }
