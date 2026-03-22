@@ -46,18 +46,19 @@ Both layers are replayable: a "Replay Onboarding" button in Settings resets ever
 - Buttons: "Continue" (primary) + "Skip" (secondary)
 
 **Step 3: Import Your First Recipe**
-- URL input field with "Import" button (primary action)
+- URL input field with "Import" button (primary action) — uses the existing `importRecipe` server action inline, within the onboarding page
 - "or" divider
-- Alternative actions: "Generate with AI" button (navigates to `/recipes/new` and triggers the AI generation modal via `RecipeGenerationProvider`), "Create Manually" button (navigates to `/recipes/new`)
+- Alternative actions: "Generate with AI" button (opens the AI generation modal inline within onboarding via `RecipeGenerationProvider`), "Create Manually" button (completes onboarding first, then navigates to `/recipes/new`)
 - Soft skip link: "I'll do this later →"
 - On successful import: show brief success state, then proceed
+- **Important:** All actions that navigate away from `/onboarding` (Create Manually, Generate with AI if it needs `/recipes/new`) must call `completeOnboarding` first to avoid redirect loops, since the `(app)` layout redirects back to `/onboarding` when `onboarding_completed === false`.
 
 ### Navigation
 
 - Progress dots at top (3 dots, active dot highlighted)
 - Each step is independently skippable
 - Back navigation not needed (steps are independent enough)
-- After completing or skipping all steps → set `onboarding_completed = true` → redirect to `/`
+- After completing or skipping all steps → call `completeOnboarding` server action (sets `onboarding_completed = true` in DB + sets `menuly_onboarding_completed` cookie) → redirect to `/`
 
 ---
 
@@ -189,8 +190,7 @@ Middleware flow:
 4. All other authenticated requests → pass through (layout handles onboarding redirect if needed)
 
 **Cookie details:**
-- Set when `completeOnboarding` server action runs, and when layout confirms `onboarding_completed === true`
-- Cleared when "Replay Onboarding" resets the flag
+- Set exclusively in server actions: `completeOnboarding` sets it, `resetOnboarding` clears it. Server component layouts cannot set cookies (the `cookies()` API is read-only in server components), so the cookie is never set from the layout.
 - HttpOnly, SameSite=Lax, path=/, maxAge=31536000 (1 year)
 
 **Note on auth callback:** After signup, the callback route redirects to `/`. The layout then detects `onboarding_completed === false` and redirects to `/onboarding`. This results in a brief double-redirect on first signup only — acceptable since the cookie prevents it from recurring.
@@ -203,7 +203,27 @@ src/app/(auth)/onboarding/
   layout.tsx        — Minimal layout (no app shell)
 ```
 
-The `/onboarding` route is in the `(auth)` route group for layout purposes (no app shell sidebar/nav). In middleware, `/onboarding` is treated as a special case: it requires authentication (like all app routes) but is NOT redirected away like `/login`. The middleware must explicitly handle `/onboarding` — the existing "auth user on /login → redirect /" logic must not apply to it. Add `/onboarding` to the middleware's path handling alongside `/login` and `/callback`.
+The `/onboarding` route is in the `(auth)` route group for layout purposes (no app shell sidebar/nav). In middleware, `/onboarding` needs two explicit handling rules:
+1. **Authentication required:** `/onboarding` must NOT be added to the unauthenticated bypass list (which contains `/login`, `/callback`, `/api/grocery/export`). Unauthenticated users visiting `/onboarding` are correctly redirected to `/login` by the existing logic.
+2. **Not redirected away:** The existing "authenticated user on `/login` → redirect `/`" logic (line ~49 of current middleware) must NOT apply to `/onboarding`. Add a separate condition: authenticated user on `/onboarding` + `menuly_onboarding_completed` cookie present → redirect `/`.
+
+### Layout Modification
+
+The `(app)/layout.tsx` must be made `async` to call `getProfile()` and conditionally `redirect("/onboarding")`. The current layout is synchronous. The change:
+
+```tsx
+// Before: export default function AppLayout({ children })
+// After:
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const { data: profile } = await getProfile();
+  if (profile && !profile.onboarding_completed) {
+    redirect("/onboarding");
+  }
+  // ...existing JSX with RecipeGenerationProvider, AppShell, etc.
+}
+```
+
+This is a safe change — Next.js App Router supports async layouts. The `redirect()` call happens before JSX rendering.
 
 ---
 
