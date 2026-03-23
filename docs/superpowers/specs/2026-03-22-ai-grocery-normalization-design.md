@@ -111,6 +111,7 @@ Start with eager fetching; optimize to lazy if performance becomes an issue.
 - `src/types/database.ts` — update `MealPlanItemWithRecipe` to include ingredients
 - New component: `src/components/meal-plan/day-accordion.tsx`
 - New component: `src/components/meal-plan/recipe-grocery-items.tsx`
+- `src/lib/onboarding-config.ts` — update plan page banner + add day-accordion and already-have spotlights
 
 ### Phase 3: "Already Have" + Grocery Generation
 
@@ -152,6 +153,7 @@ Start with eager fetching; optimize to lazy if performance becomes an issue.
 - `src/actions/meal-plans.ts` — new action: `toggleAlreadyHaveItem(mealPlanId, groceryName)`
 - `src/types/database.ts` — update `MealPlan` type
 - Delete: `src/lib/ai-grocery-consolidator.ts`
+- `src/lib/onboarding-config.ts` — update grocery page banner to mention "already have" exclusion
 
 ## Data Flow Example
 
@@ -198,6 +200,35 @@ Generate Grocery List:
 | Recipe used multiple times in meal plan | Each occurrence contributes full quantities (not deduplicated) |
 | Household context | Normalized data is per-recipe (shared). "Already have" is per-meal-plan (shared in household). Both members see same state. |
 | Drag-and-drop in accordion view | Works between expanded days; cross-day drag requires both days expanded |
+
+## Onboarding & Tooltips
+
+Integrate with the existing onboarding system (`OnboardingProvider` + `PageGuide` + `SpotlightTour`). Changes go in `src/lib/onboarding-config.ts`.
+
+### Meal Plan page (`plan`)
+
+**Update banner** — Revise to mention the new accordion layout and "already have" feature:
+- Icon: "📅"
+- Title: "Plan your week and mark what you have"
+- Description: "Expand any day to see your meals and their ingredients. Mark items you already have at home — they'll be excluded from your grocery list."
+
+**New spotlights:**
+- **Day accordion** (`data-onboarding="day-accordion"`): "Expand a Day" — "Tap a day to see your meals and the grocery items you'll need. Mark anything you already have at home."
+- **Already-have checkbox** (`data-onboarding="already-have"`): "Already Have It?" — "Check off ingredients you already have. This applies to the whole week — if garlic is needed in multiple recipes, checking it once excludes it from your grocery list."
+
+### Grocery page (`grocery`)
+
+**Update banner** — Mention that "already have" items are pre-excluded:
+- Description: "Generated from your finalized meal plan — ingredients you marked as 'already have' are excluded. Quantities are combined across recipes."
+
+### Recipes page (no changes needed)
+
+AI normalization is invisible to the user — no onboarding needed for Phase 1.
+
+### Settings page
+
+If a backfill button is added ("Normalize all recipes"), add a brief tooltip:
+- "Updates your recipes with clean grocery names for better shopping lists."
 
 ## Migration Path
 
