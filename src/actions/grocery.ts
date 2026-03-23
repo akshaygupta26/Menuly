@@ -12,7 +12,8 @@ import {
   consolidateIngredients,
   recipeIngredientsToInputs,
 } from "@/lib/grocery-consolidator";
-import type { ConsolidationInput } from "@/lib/grocery-consolidator";
+import type { ConsolidationInput, GroupedGroceryItems } from "@/lib/grocery-consolidator";
+import { aiConsolidateIngredients } from "@/lib/ai-grocery-consolidator";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -149,16 +150,84 @@ export async function generateGroceryList(
     return { data: null, error: ingredientsError.message };
   }
 
-  // Build consolidation inputs
-  const inputs: ConsolidationInput[] = [];
-  for (const ing of allIngredients ?? []) {
-    inputs.push(
-      ...recipeIngredientsToInputs([ing], ing.recipe_id)
-    );
-  }
+  // Fetch recipe metadata for AI prompt
+  const { data: recipes } = await supabase
+    .from("recipes")
+    .select("id, name, servings")
+    .in("id", recipeIds);
 
-  // Consolidate ingredients
-  const grouped = consolidateIngredients(inputs);
+  // Regex-based fallback consolidator
+  const regexConsolidate = (): GroupedGroceryItems[] => {
+    const inputs: ConsolidationInput[] = [];
+    for (const ing of allIngredients ?? []) {
+      inputs.push(...recipeIngredientsToInputs([ing], ing.recipe_id));
+    }
+    return consolidateIngredients(inputs);
+  };
+
+  // Try AI consolidation first, fallback to regex
+  let grouped: GroupedGroceryItems[];
+  const aiConfigured =
+    process.env.AI_API_KEY && process.env.AI_BASE_URL && process.env.AI_MODEL;
+
+  if (aiConfigured && recipes && recipes.length > 0) {
+    // Check rate limit
+    let canUseAI = false;
+    let currentCount = 0;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("ai_generation_count, ai_generation_reset_at, ai_unlimited")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile) {
+      currentCount = profile.ai_generation_count as number;
+      const DAILY_LIMIT = 3;
+
+      if (profile.ai_unlimited) {
+        canUseAI = true;
+      } else {
+        const resetAt = new Date(profile.ai_generation_reset_at as string);
+        const now = new Date();
+        const msIn24h = 24 * 60 * 60 * 1000;
+
+        if (now.getTime() - resetAt.getTime() >= msIn24h) {
+          await supabase
+            .from("profiles")
+            .update({
+              ai_generation_count: 0,
+              ai_generation_reset_at: now.toISOString(),
+            })
+            .eq("user_id", user.id);
+          currentCount = 0;
+        }
+
+        canUseAI = currentCount < DAILY_LIMIT;
+      }
+    }
+
+    if (canUseAI) {
+      try {
+        grouped = await aiConsolidateIngredients(
+          recipes as { id: string; name: string; servings: number | null }[],
+          (allIngredients ?? []) as import("@/types/database").RecipeIngredient[]
+        );
+        // Increment AI usage count on success
+        await supabase
+          .from("profiles")
+          .update({ ai_generation_count: currentCount + 1 })
+          .eq("user_id", user.id);
+      } catch {
+        // AI failed — silent fallback to regex consolidator
+        grouped = regexConsolidate();
+      }
+    } else {
+      grouped = regexConsolidate();
+    }
+  } else {
+    grouped = regexConsolidate();
+  }
 
   // Deactivate any existing active grocery lists
   await applyOwnershipFilter(
