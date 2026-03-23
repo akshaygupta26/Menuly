@@ -9,6 +9,7 @@ import type {
   RecipeHistory,
   MealType,
 } from "@/types/database";
+import { normalizeIngredients } from "@/lib/ai-ingredient-normalizer";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -198,6 +199,37 @@ export async function createRecipe(
       await supabase.from("recipes").delete().eq("id", newRecipe.id);
       return { data: null, error: ingredientsError.message };
     }
+
+    // AI-normalize grocery fields (non-blocking — failure leaves grocery_* as null)
+    try {
+      const { data: inserted } = await supabase
+        .from("recipe_ingredients")
+        .select("id, raw_text")
+        .eq("recipe_id", newRecipe.id);
+
+      if (inserted && inserted.length > 0) {
+        const normalized = await normalizeIngredients(inserted);
+
+        for (const item of normalized) {
+          await supabase
+            .from("recipe_ingredients")
+            .update({
+              grocery_name: item.grocery_name,
+              grocery_quantity: item.grocery_quantity,
+              grocery_unit: item.grocery_unit,
+              grocery_category: item.grocery_category,
+            })
+            .eq("id", item.id);
+        }
+
+        await supabase
+          .from("recipes")
+          .update({ grocery_normalized_at: new Date().toISOString() })
+          .eq("id", newRecipe.id);
+      }
+    } catch {
+      // AI normalization failed — grocery_* stays null, recipe saves fine
+    }
   }
 
   revalidatePath("/recipes");
@@ -268,6 +300,37 @@ export async function updateRecipe(
       if (insertError) {
         return { data: null, error: insertError.message };
       }
+    }
+
+    // AI-normalize grocery fields (non-blocking — failure leaves grocery_* as null)
+    try {
+      const { data: inserted } = await supabase
+        .from("recipe_ingredients")
+        .select("id, raw_text")
+        .eq("recipe_id", id);
+
+      if (inserted && inserted.length > 0) {
+        const normalized = await normalizeIngredients(inserted);
+
+        for (const item of normalized) {
+          await supabase
+            .from("recipe_ingredients")
+            .update({
+              grocery_name: item.grocery_name,
+              grocery_quantity: item.grocery_quantity,
+              grocery_unit: item.grocery_unit,
+              grocery_category: item.grocery_category,
+            })
+            .eq("id", item.id);
+        }
+
+        await supabase
+          .from("recipes")
+          .update({ grocery_normalized_at: new Date().toISOString() })
+          .eq("id", id);
+      }
+    } catch {
+      // AI normalization failed — grocery_* stays null, recipe saves fine
     }
   }
 
