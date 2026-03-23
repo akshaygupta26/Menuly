@@ -14,11 +14,12 @@ Weekly meal planning & grocery list app. Users build a recipe library, auto-gene
 After making changes, always verify with `pnpm tsc --noEmit` and `pnpm lint` before considering a task done.
 
 ## Architecture
-- **Route groups:** `(auth)` for login/callback, `(app)` for authenticated pages (recipes, plan, grocery, settings, dashboard)
+- **Route groups:** `(auth)` for login/callback/onboarding, `(app)` for authenticated pages (recipes, plan, grocery, settings, dashboard)
 - **Server/client split:** Server components fetch data via server actions, pass to `"use client"` wrapper components for interactivity
 - **Server actions** (`src/actions/`): All return `{ data, error }` via `ActionResult<T>` type. Always call `getAuthenticatedUser()` first and `revalidatePath()` after mutations
 - **Supabase clients:** `@/lib/supabase/client` (browser), `@/lib/supabase/server` (server). Never import the wrong one
-- **Auth middleware** (`src/middleware.ts`): Redirects unauth users to `/login`, auth users away from `/login` to `/`
+- **Auth middleware** (`src/middleware.ts`): Redirects unauth users to `/login`, auth users away from `/login` to `/`. Handles `/onboarding` route: if `menuly_onboarding_completed` cookie is set, redirects to `/`
+- **Onboarding redirect** (`src/app/(app)/layout.tsx`): Async layout checks `profile.onboarding_completed` via `getProfile()` — if `false`, redirects to `/onboarding`
 - **API routes** are for external/fetch-based calls (recipe import, meal plan generation, grocery export). Internal mutations use server actions
 - **Realtime:** Grocery items use Supabase Realtime subscriptions for live sync between users
 
@@ -28,7 +29,7 @@ Full schema: `supabase/migrations/001_initial_schema.sql` — 8 tables, RLS on a
 
 | Table | Purpose |
 |---|---|
-| `profiles` | Per-user settings (meal_slots preferences) |
+| `profiles` | Per-user settings (meal_slots, onboarding state, dietary preferences, allergies) |
 | `recipes` | Core recipe data incl. nutrition fields and `nutrition_source` |
 | `recipe_ingredients` | Structured ingredients linked to a recipe |
 | `meal_plans` | Weekly plan with `draft` / `finalized` status |
@@ -42,6 +43,19 @@ Full schema: `supabase/migrations/001_initial_schema.sql` — 8 tables, RLS on a
 - `MealType = "breakfast" | "lunch" | "dinner" | "snack"`
 - `IngredientCategory = "produce" | "dairy" | "meat" | "pantry" | "frozen" | "bakery" | "beverages" | "other"`
 - `MealPlanStatus = "draft" | "finalized"`
+
+## Onboarding Feature
+- **Two layers:** Initial 3-step welcome flow (`/onboarding` route) + per-page contextual guidance (banners + tooltip spotlights)
+- **Initial flow:** Step 1 (overview), Step 2 (meal slots + dietary preferences + allergies), Step 3 (import first recipe). Each step skippable.
+- **Per-page guidance:** `PageGuide` component renders a dismissible banner on first visit to each page + `SpotlightTour` highlighting key UI elements. Driven by `OnboardingProvider` context.
+- **Help icon:** `PageGuideHelpIcon` (`?` button) in each page header re-triggers the page's guide anytime
+- **Replay:** "Replay Onboarding" button in Settings resets `onboarding_completed` + `onboarding_page_visits` and navigates back to `/onboarding`
+- **State:** `onboarding_completed` (boolean), `onboarding_page_visits` (JSONB), `dietary_preferences` (text[]), `allergies` (text[]) on `profiles` table. Cookie `menuly_onboarding_completed` for middleware fast-path.
+- **Migration:** `supabase/migrations/010_onboarding.sql`
+- **Types:** `src/types/onboarding.ts` — `OnboardingPage`, `DietaryPreference`, `Allergy`, `OnboardingPageConfig`
+- **Config:** `src/lib/onboarding-config.ts` — per-page banner + spotlight definitions
+- **Components:** `src/components/onboarding/` — onboarding-provider, page-guide, page-guide-banner, spotlight-tour, help-icon, step-overview, step-preferences, step-first-recipe
+- **Actions:** `src/actions/onboarding.ts` — completeOnboarding, resetOnboarding, updateOnboardingPageVisit, getOnboardingState
 
 ## Nutrition Feature
 - **Schema:** `recipes` table has nullable columns: `calories`, `protein_g`, `carbs_g`, `fat_g` (all `NUMERIC`), `nutrition_source` (`TEXT CHECK IN ('json_ld', 'usda', 'manual')`)
@@ -69,7 +83,7 @@ Full schema: `supabase/migrations/001_initial_schema.sql` — 8 tables, RLS on a
 - **Env vars in Vercel:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `USDA_API_KEY`
 
 ## Important Files / Paths
-- `src/actions/` — server actions (recipes.ts, meal-plans.ts, grocery.ts, settings.ts, auth.ts)
+- `src/actions/` — server actions (recipes.ts, meal-plans.ts, grocery.ts, settings.ts, auth.ts, onboarding.ts)
 - `src/lib/rotation-algorithm.ts` — smart meal rotation scoring (recency + cuisine/protein diversity)
 - `src/lib/recipe-scraper.ts` — JSON-LD + nutrition extraction from recipe URLs
 - `src/lib/nutrition.ts` — USDA API client and nutrition calculator
@@ -79,6 +93,10 @@ Full schema: `supabase/migrations/001_initial_schema.sql` — 8 tables, RLS on a
 - `src/app/api/nutrition/calculate/route.ts` — POST endpoint for USDA-based nutrition calculation
 - `supabase/migrations/001_initial_schema.sql` — full DB schema (8 tables, RLS, triggers)
 - `supabase/migrations/002_nutrition_columns.sql` — nutrition columns on recipes table
+- `supabase/migrations/010_onboarding.sql` — onboarding + dietary/allergy columns on profiles
+- `src/components/onboarding/` — all onboarding UI components
+- `src/hooks/use-spotlight.ts` — spotlight positioning hook for per-page tours
+- `src/lib/onboarding-config.ts` — per-page banner and spotlight config
 - `src/app/globals.css` — theme variables (terracotta primary, sage secondary, oklch color space)
 
 ## Do Nots
