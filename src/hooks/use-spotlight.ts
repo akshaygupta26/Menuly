@@ -20,26 +20,28 @@ export function useSpotlight(steps: SpotlightStep[]) {
   const [targetRect, setTargetRect] = useState<SpotlightPosition | null>(null);
   const [visible, setVisible] = useState(false);
   const rafRef = useRef<number | undefined>(undefined);
-  // Ref to avoid stale closures and infinite loops from steps array identity changes
   const stepsRef = useRef(steps);
-  stepsRef.current = steps;
+  useEffect(() => {
+    stepsRef.current = steps;
+  });
 
   const isActive = currentStep >= 0;
   const activeStepData = isActive ? steps[currentStep] : null;
 
-  // Skip missing targets: separate effect that only depends on currentStep
+  // Skip missing targets — uses requestAnimationFrame to avoid synchronous setState in effect
   useEffect(() => {
     if (currentStep < 0) return;
     const step = stepsRef.current[currentStep];
     if (!step) {
-      setCurrentStep(-1);
+      requestAnimationFrame(() => setCurrentStep(-1));
       return;
     }
     const el = document.querySelector(`[data-onboarding="${step.target}"]`);
     if (!el) {
-      // Skip to next step if target doesn't exist
       const next = currentStep + 1;
-      setCurrentStep(next < stepsRef.current.length ? next : -1);
+      requestAnimationFrame(() =>
+        setCurrentStep(next < stepsRef.current.length ? next : -1)
+      );
     }
   }, [currentStep]);
 
@@ -56,7 +58,6 @@ export function useSpotlight(steps: SpotlightStep[]) {
       height: rect.height,
     });
 
-    // Scroll into view if needed
     if (rect.top < 0 || rect.bottom > window.innerHeight) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
@@ -64,11 +65,13 @@ export function useSpotlight(steps: SpotlightStep[]) {
 
   useEffect(() => {
     if (!isActive) {
-      setVisible(false);
-      setTargetRect(null);
+      // Use rAF to avoid synchronous setState in effect cleanup
+      requestAnimationFrame(() => {
+        setVisible(false);
+        setTargetRect(null);
+      });
       return;
     }
-    // Short delay for fade-in
     const timer = setTimeout(() => setVisible(true), 50);
     updatePosition();
 

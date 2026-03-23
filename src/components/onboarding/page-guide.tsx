@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOnboarding } from "./onboarding-provider";
 import { PageGuideBanner } from "./page-guide-banner";
 import { SpotlightTour } from "./spotlight-tour";
@@ -14,25 +14,24 @@ interface PageGuideProps {
 }
 
 export function PageGuide({ page }: PageGuideProps) {
-  const { isPageVisited, markPageVisited, activeGuide, showGuide } = useOnboarding();
+  const { isPageVisited, markPageVisited, activeGuide } = useOnboarding();
   const config = ONBOARDING_CONFIG[page];
-  const [showBanner, setShowBanner] = useState(false);
+  // Initialize banner visibility based on whether page was already visited
+  const [showBanner, setShowBanner] = useState(() => !isPageVisited(page));
   const spotlight = useSpotlight(config.spotlights);
   const { start: startSpotlight } = spotlight;
+  const prevActiveGuide = useRef(activeGuide);
 
-  // Show banner on first visit
+  // Handle "Show me around" triggering from help icon — only react to changes
   useEffect(() => {
-    if (!isPageVisited(page)) {
-      setShowBanner(true);
+    if (activeGuide === page && prevActiveGuide.current !== page) {
+      // Use a microtask to avoid synchronous setState in effect
+      queueMicrotask(() => {
+        setShowBanner(true);
+        startSpotlight();
+      });
     }
-  }, [page, isPageVisited]);
-
-  // Handle "Show me around" triggering from help icon
-  useEffect(() => {
-    if (activeGuide === page) {
-      setShowBanner(true);
-      startSpotlight();
-    }
+    prevActiveGuide.current = activeGuide;
   }, [activeGuide, page, startSpotlight]);
 
   const handleDismissBanner = () => {
@@ -44,11 +43,6 @@ export function PageGuide({ page }: PageGuideProps) {
     if (wasFirstVisit) {
       setTimeout(() => startSpotlight(), 300);
     }
-  };
-
-  const handleShowGuide = () => {
-    showGuide(page);
-    setShowBanner(true);
   };
 
   return (

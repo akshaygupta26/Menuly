@@ -1,7 +1,16 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+// SSR-safe mount check without useEffect + setState
+const subscribe = () => () => {};
+const getSnapshot = () => true;
+const getServerSnapshot = () => false;
+
+function useIsMounted() {
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
 
 interface SpotlightTourProps {
   visible: boolean;
@@ -22,11 +31,7 @@ export function SpotlightTour({
   onNext,
   onSkip,
 }: SpotlightTourProps) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useIsMounted();
 
   if (!mounted || !targetRect || !step) return null;
 
