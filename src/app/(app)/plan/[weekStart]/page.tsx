@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getMealPlan } from "@/actions/meal-plans";
 import { getProfile } from "@/actions/settings";
 import { Header } from "@/components/layout/header";
+import { PageGuide, PageGuideHelpIcon } from "@/components/onboarding/page-guide";
 import { Button } from "@/components/ui/button";
 import { MealPlanClient } from "./meal-plan-client";
 
@@ -37,6 +38,7 @@ export default async function MealPlanPage({ params }: MealPlanPageProps) {
   return (
     <div className="animate-page-enter">
       <Header title="Meal Plan" subtitle={dateRangeTitle}>
+        <PageGuideHelpIcon page="plan" />
         <div className="flex items-center gap-1">
           <Button asChild variant="ghost" size="icon-sm">
             <Link href={`/plan/${prevWeek}`} aria-label="Previous week">
@@ -50,6 +52,7 @@ export default async function MealPlanPage({ params }: MealPlanPageProps) {
           </Button>
         </div>
       </Header>
+      <PageGuide page="plan" />
 
       {error ? (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">

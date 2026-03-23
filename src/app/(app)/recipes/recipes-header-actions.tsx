@@ -14,7 +14,7 @@ export function RecipesHeaderActions() {
           <span className="hidden sm:inline">Import URL</span>
         </Link>
       </Button>
-      <Button asChild size="sm">
+      <Button asChild size="sm" data-onboarding="add-recipe">
         <Link href="/recipes/new">
           <Plus className="size-4" />
           <span className="hidden sm:inline">Add Recipe</span>

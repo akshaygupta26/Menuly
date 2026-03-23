@@ -1,5 +1,6 @@
 import { getRecipes } from "@/actions/recipes";
 import { Header } from "@/components/layout/header";
+import { PageGuide, PageGuideHelpIcon } from "@/components/onboarding/page-guide";
 import { RecipeListClient } from "./recipes-client";
 import { RecipesHeaderActions } from "./recipes-header-actions";
 import { DiscoverSection } from "@/components/recipes/discover-section";
@@ -11,8 +12,10 @@ export default async function RecipesPage() {
   return (
     <div className="animate-page-enter">
       <Header title="Recipes" subtitle="All your saved recipes">
+        <PageGuideHelpIcon page="recipes" />
         <RecipesHeaderActions />
       </Header>
+      <PageGuide page="recipes" />
 
       <QuickBar />
 

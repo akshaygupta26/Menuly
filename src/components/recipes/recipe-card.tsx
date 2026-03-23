@@ -70,6 +70,7 @@ export function RecipeCard({ recipe, onToggleFavorite }: RecipeCardProps) {
             className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm transition-colors hover:bg-white"
             onClick={handleFavoriteClick}
             aria-label={recipe.is_favorite ? "Remove from favorites" : "Add to favorites"}
+            data-onboarding="favorite-toggle"
           >
             <Star
               className={cn(

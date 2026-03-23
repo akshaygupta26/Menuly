@@ -3,6 +3,7 @@ import { ShoppingCart } from "lucide-react";
 
 import { getActiveGroceryList } from "@/actions/grocery";
 import { Header } from "@/components/layout/header";
+import { PageGuide, PageGuideHelpIcon } from "@/components/onboarding/page-guide";
 import { Button } from "@/components/ui/button";
 import { GroceryListView } from "@/components/grocery/grocery-list-view";
 
@@ -12,7 +13,10 @@ export default async function GroceryPage() {
   if (error) {
     return (
       <div className="animate-page-enter">
-        <Header title="Grocery List" />
+        <Header title="Grocery List">
+          <PageGuideHelpIcon page="grocery" />
+        </Header>
+        <PageGuide page="grocery" />
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
         </div>
@@ -23,7 +27,10 @@ export default async function GroceryPage() {
   if (!data) {
     return (
       <div className="animate-page-enter">
-        <Header title="Grocery List" />
+        <Header title="Grocery List">
+          <PageGuideHelpIcon page="grocery" />
+        </Header>
+        <PageGuide page="grocery" />
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="mb-4 rounded-full bg-muted p-4">
             <ShoppingCart className="size-8 text-muted-foreground" />
@@ -45,7 +52,10 @@ export default async function GroceryPage() {
       <Header
         title="Grocery List"
         subtitle={`${data.items.length} item${data.items.length !== 1 ? "s" : ""}`}
-      />
+      >
+        <PageGuideHelpIcon page="grocery" />
+      </Header>
+      <PageGuide page="grocery" />
       <GroceryListView initialList={data.list} initialItems={data.items} />
     </div>
   );

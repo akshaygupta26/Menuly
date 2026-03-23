@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/layout/header";
+import { PageGuide, PageGuideHelpIcon } from "@/components/onboarding/page-guide";
 import { getRecipes } from "@/actions/recipes";
 import { getMealPlan } from "@/actions/meal-plans";
 import { getActiveGroceryList } from "@/actions/grocery";
@@ -60,11 +61,14 @@ export default async function DashboardPage() {
       <Header
         title="Welcome to Menuly"
         subtitle="Your weekly meal planning hub"
-      />
+      >
+        <PageGuideHelpIcon page="dashboard" />
+      </Header>
+      <PageGuide page="dashboard" />
 
       <div className="grid gap-4 sm:grid-cols-2">
         {/* This Week's Plan */}
-        <Card>
+        <Card data-onboarding="plan-card">
           <CardHeader>
             <div className="flex items-center gap-2">
               <CalendarDays className="size-5 text-primary" />
@@ -106,7 +110,7 @@ export default async function DashboardPage() {
         </Card>
 
         {/* Recipe Collection */}
-        <Card>
+        <Card data-onboarding="recipe-card">
           <CardHeader>
             <div className="flex items-center gap-2">
               <UtensilsCrossed className="size-5 text-primary" />
@@ -189,7 +193,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="mt-6">
+      <div className="mt-6" data-onboarding="quick-actions">
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">
           Quick Actions
         </h2>

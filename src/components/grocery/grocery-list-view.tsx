@@ -305,11 +305,12 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
 
       {/* Category groups */}
       <div className="space-y-4">
-        {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((category) => {
+        {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((category, categoryIndex) => {
           const categoryItems = grouped.get(category)!;
           const isCollapsed = effectiveCollapsed.has(category);
           const categoryChecked = categoryItems.filter((i) => i.is_checked).length;
           const allDone = categoryChecked === categoryItems.length && categoryItems.length > 0;
+          const isFirstCategory = categoryIndex === 0;
 
           return (
             <div key={category} className="rounded-lg border overflow-hidden">
@@ -324,6 +325,7 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
                     ? "bg-green-50 text-green-700 hover:bg-green-100"
                     : "hover:bg-muted/50"
                 }`}
+                {...(isFirstCategory ? { "data-onboarding": "grocery-category" } : {})}
               >
                 {isCollapsed ? (
                   <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -354,10 +356,11 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
                 <div className="overflow-hidden">
                   <div className="border-t px-4 py-2">
                     <ul className="divide-y">
-                      {categoryItems.map((item) => (
+                      {categoryItems.map((item, itemIndex) => (
                         <li
                           key={item.id}
                           className="flex items-center gap-3 py-2.5 group"
+                          {...(isFirstCategory && itemIndex === 0 ? { "data-onboarding": "grocery-item" } : {})}
                         >
                           {/* Custom checkbox */}
                           <button

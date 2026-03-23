@@ -398,6 +398,7 @@ export function WeekGrid({
             size="sm"
             onClick={onAutoGenerate}
             disabled={isPending || isFinalized}
+            data-onboarding="auto-generate"
           >
             <Sparkles className="size-3.5" />
             Auto-Generate
@@ -447,6 +448,7 @@ export function WeekGrid({
               size="sm"
               onClick={onUnfinalize}
               disabled={isPending}
+              data-onboarding="finalize-plan"
             >
               <Unlock className="size-3.5" />
               Unfinalize
@@ -456,6 +458,7 @@ export function WeekGrid({
               size="sm"
               onClick={onFinalize}
               disabled={isPending}
+              data-onboarding="finalize-plan"
             >
               <Lock className="size-3.5" />
               Finalize Week
@@ -517,13 +520,15 @@ export function WeekGrid({
             ))}
 
             {/* Meal slot rows */}
-            {mealSlots.map((slot) =>
-              dayDates.map(({ dayOfWeek }) => {
+            {mealSlots.map((slot, slotIndex) =>
+              dayDates.map(({ dayOfWeek }, dayIndex) => {
                 const item = itemsByKey.get(`${dayOfWeek}-${slot}`);
+                const isFirstCell = slotIndex === 0 && dayIndex === 0;
                 return (
                   <div
                     key={`${dayOfWeek}-${slot}`}
                     className="flex min-w-0 flex-col gap-1 bg-background p-1.5"
+                    {...(isFirstCell ? { "data-onboarding": "meal-slot" } : {})}
                   >
                     <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
                       {SLOT_LABELS[slot]}

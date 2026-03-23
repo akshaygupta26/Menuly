@@ -19,6 +19,7 @@ import { logout } from "@/actions/auth";
 import type { MealType } from "@/types/database";
 
 import { Header } from "@/components/layout/header";
+import { PageGuide, PageGuideHelpIcon } from "@/components/onboarding/page-guide";
 import { HouseholdSection } from "@/components/household/household-section";
 import { Button } from "@/components/ui/button";
 import {
@@ -144,13 +145,16 @@ export default function SettingsPage() {
 
   return (
     <div className="animate-page-enter">
-      <Header title="Settings" subtitle="Manage your preferences and account" />
+      <Header title="Settings" subtitle="Manage your preferences and account">
+        <PageGuideHelpIcon page="settings" />
+      </Header>
+      <PageGuide page="settings" />
 
       <div className="space-y-6">
         {/* ================================================================ */}
         {/* Meal Preferences                                                 */}
         {/* ================================================================ */}
-        <Card>
+        <Card data-onboarding="meal-preferences">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UtensilsCrossed className="size-5 text-primary" />
@@ -207,7 +211,9 @@ export default function SettingsPage() {
         {/* ================================================================ */}
         {/* Household                                                        */}
         {/* ================================================================ */}
-        <HouseholdSection />
+        <div data-onboarding="household-section">
+          <HouseholdSection />
+        </div>
 
         {/* ================================================================ */}
         {/* Apple Reminders Sync                                             */}
