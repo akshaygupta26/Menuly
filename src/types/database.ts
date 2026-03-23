@@ -98,6 +98,7 @@ export interface Recipe {
   nutrition_source: NutritionSource | null;
   created_at: string;
   updated_at: string;
+  grocery_normalized_at: string | null;
 }
 
 export interface RecipeIngredient {
@@ -111,6 +112,10 @@ export interface RecipeIngredient {
   is_optional: boolean;
   raw_text: string;
   sort_order: number;
+  grocery_name: string | null;
+  grocery_quantity: number | null;
+  grocery_unit: string | null;
+  grocery_category: string | null;
 }
 
 export interface RecipeHistory {

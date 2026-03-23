@@ -23,9 +23,9 @@ interface RecipeFilters {
   tags?: string[];
 }
 
-type RecipeInput = Omit<Recipe, "id" | "user_id" | "household_id" | "created_at" | "updated_at" | "last_made_date" | "times_made">;
+type RecipeInput = Omit<Recipe, "id" | "user_id" | "household_id" | "created_at" | "updated_at" | "last_made_date" | "times_made" | "grocery_normalized_at">;
 
-type RecipeIngredientInput = Omit<RecipeIngredient, "id" | "recipe_id">;
+type RecipeIngredientInput = Omit<RecipeIngredient, "id" | "recipe_id" | "grocery_name" | "grocery_quantity" | "grocery_unit" | "grocery_category">;
 
 interface CreateRecipeData {
   recipe: RecipeInput;
