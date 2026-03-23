@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Copy,
   Check,
   ChevronDown,
   ChevronRight,
   LogOut,
+  Loader2,
   Smartphone,
   UtensilsCrossed,
   User,
@@ -14,9 +16,17 @@ import {
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
-import { getProfile, updateMealSlots } from "@/actions/settings";
+import {
+  getProfile,
+  updateMealSlots,
+  updateDietaryPreferences,
+  updateAllergies,
+} from "@/actions/settings";
 import { logout } from "@/actions/auth";
+import { resetOnboarding } from "@/actions/onboarding";
 import type { MealType } from "@/types/database";
+import { DIETARY_PREFERENCES, ALLERGIES } from "@/types/onboarding";
+import type { DietaryPreference, Allergy } from "@/types/onboarding";
 
 import { Header } from "@/components/layout/header";
 import { PageGuide, PageGuideHelpIcon } from "@/components/onboarding/page-guide";
@@ -43,17 +53,33 @@ const ALL_MEAL_SLOTS: { value: MealType; label: string }[] = [
   { value: "snack", label: "Snack" },
 ];
 
+function formatChipLabel(value: string): string {
+  return value
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export default function SettingsPage() {
+  const router = useRouter();
+
   const [isMealPending, startMealTransition] = useTransition();
   const [isLogoutPending, startLogoutTransition] = useTransition();
+  const [isDietaryPending, startDietaryTransition] = useTransition();
+  const [isAllergyPending, startAllergyTransition] = useTransition();
+  const [isResetting, startResetTransition] = useTransition();
 
   // Profile / Meal slots
   const [mealSlots, setMealSlots] = useState<MealType[]>([]);
   const [profileLoaded, setProfileLoaded] = useState(false);
+
+  // Dietary preferences & allergies
+  const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreference[]>([]);
+  const [allergies, setAllergies] = useState<Allergy[]>([]);
 
   // Auth info
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -72,6 +98,8 @@ export default function SettingsPage() {
       const { data } = await getProfile();
       if (data) {
         setMealSlots(data.meal_slots);
+        setDietaryPreferences(data.dietary_preferences ?? []);
+        setAllergies(data.allergies ?? []);
       }
       setProfileLoaded(true);
 
@@ -117,6 +145,44 @@ export default function SettingsPage() {
     });
   }
 
+  function handleToggleDietaryPreference(pref: DietaryPreference) {
+    const prev = dietaryPreferences;
+    const next = prev.includes(pref)
+      ? prev.filter((p) => p !== pref)
+      : [...prev, pref];
+
+    setDietaryPreferences(next);
+
+    startDietaryTransition(async () => {
+      const { error } = await updateDietaryPreferences(next);
+      if (error) {
+        toast.error(error);
+        setDietaryPreferences(prev);
+      } else {
+        toast.success("Dietary preferences updated");
+      }
+    });
+  }
+
+  function handleToggleAllergy(allergy: Allergy) {
+    const prev = allergies;
+    const next = prev.includes(allergy)
+      ? prev.filter((a) => a !== allergy)
+      : [...prev, allergy];
+
+    setAllergies(next);
+
+    startAllergyTransition(async () => {
+      const { error } = await updateAllergies(next);
+      if (error) {
+        toast.error(error);
+        setAllergies(prev);
+      } else {
+        toast.success("Allergies updated");
+      }
+    });
+  }
+
   async function copyToClipboard(text: string, field: string) {
     try {
       await navigator.clipboard.writeText(text);
@@ -133,6 +199,17 @@ export default function SettingsPage() {
       await logout();
     });
   }
+
+  const handleReplayOnboarding = () => {
+    startResetTransition(async () => {
+      const result = await resetOnboarding();
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      router.push("/onboarding");
+    });
+  };
 
   // ---- Derived values ------------------------------------------------------
 
@@ -205,6 +282,94 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* ================================================================ */}
+        {/* Dietary Preferences & Allergies                                  */}
+        {/* ================================================================ */}
+        <Card data-onboarding="dietary-preferences">
+          <CardHeader>
+            <CardTitle>Dietary Preferences &amp; Allergies</CardTitle>
+            <CardDescription>
+              Tell us about your dietary needs so we can tailor meal suggestions
+              for you.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Dietary Preferences */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Dietary Preferences</Label>
+              {profileLoaded ? (
+                <div className="flex flex-wrap gap-2">
+                  {DIETARY_PREFERENCES.map((pref) => {
+                    const isSelected = dietaryPreferences.includes(pref);
+                    return (
+                      <button
+                        key={pref}
+                        type="button"
+                        disabled={isDietaryPending}
+                        onClick={() => handleToggleDietaryPreference(pref)}
+                        className={[
+                          "rounded-full border px-3 py-1 text-sm transition-colors",
+                          isSelected
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-background text-foreground hover:border-primary/60 hover:bg-primary/5",
+                        ].join(" ")}
+                      >
+                        {formatChipLabel(pref)}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {DIETARY_PREFERENCES.map((pref) => (
+                    <div
+                      key={pref}
+                      className="h-7 w-20 animate-pulse rounded-full bg-muted"
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Allergies */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Allergies</Label>
+              {profileLoaded ? (
+                <div className="flex flex-wrap gap-2">
+                  {ALLERGIES.map((allergy) => {
+                    const isSelected = allergies.includes(allergy);
+                    return (
+                      <button
+                        key={allergy}
+                        type="button"
+                        disabled={isAllergyPending}
+                        onClick={() => handleToggleAllergy(allergy)}
+                        className={[
+                          "rounded-full border px-3 py-1 text-sm transition-colors",
+                          isSelected
+                            ? "border-destructive/40 bg-destructive/10 text-destructive"
+                            : "border-border bg-background text-foreground hover:border-destructive/40 hover:bg-destructive/5",
+                        ].join(" ")}
+                      >
+                        {formatChipLabel(allergy)}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {ALLERGIES.map((allergy) => (
+                    <div
+                      key={allergy}
+                      className="h-7 w-20 animate-pulse rounded-full bg-muted"
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -391,6 +556,28 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ================================================================ */}
+        {/* Replay Onboarding                                                */}
+        {/* ================================================================ */}
+        <Card data-onboarding="replay-onboarding">
+          <CardHeader>
+            <CardTitle>Onboarding</CardTitle>
+            <CardDescription>
+              Re-run the welcome tour and page guides
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={handleReplayOnboarding}
+              disabled={isResetting}
+            >
+              {isResetting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Replay Onboarding
+            </Button>
           </CardContent>
         </Card>
 
