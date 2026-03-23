@@ -17,14 +17,12 @@ const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [pageVisits, setPageVisits] = useState<Partial<Record<OnboardingPage, boolean>>>({});
   const [activeGuide, setActiveGuide] = useState<OnboardingPage | null>(null);
-  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     getOnboardingState().then((result) => {
       if (result.data) {
         setPageVisits(result.data.onboarding_page_visits);
       }
-      setLoaded(true);
     });
   }, []);
 
@@ -41,8 +39,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     (page: OnboardingPage) => !!pageVisits[page],
     [pageVisits]
   );
-
-  if (!loaded) return <>{children}</>;
 
   return (
     <OnboardingContext.Provider

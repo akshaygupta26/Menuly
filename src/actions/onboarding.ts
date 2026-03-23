@@ -106,8 +106,14 @@ export async function resetOnboarding(): Promise<ActionResult> {
 
   if (error) return { data: null, error: error.message };
 
+  // Clear cookie by setting maxAge to 0 (delete() may not match path/domain)
   const cookieStore = await cookies();
-  cookieStore.delete(ONBOARDING_COOKIE);
+  cookieStore.set(ONBOARDING_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
 
   revalidatePath("/");
   revalidatePath("/settings");
