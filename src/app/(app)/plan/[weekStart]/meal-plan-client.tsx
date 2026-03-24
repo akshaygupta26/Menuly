@@ -19,6 +19,7 @@ import {
   clearMealPlanSlot,
   finalizeMealPlan,
   unfinalizeMealPlan,
+  toggleAlreadyHaveItem,
 } from "@/actions/meal-plans";
 import { generateGroceryList } from "@/actions/grocery";
 import { WeekGrid } from "@/components/meal-plan/week-grid";
@@ -343,7 +344,10 @@ export function MealPlanClient({
         ? prev.filter((item) => item !== groceryName)
         : [...prev, groceryName]
     );
-    // TODO: Wire to toggleAlreadyHaveItem server action in Phase 3
+    // Persist to server (fire-and-forget, optimistic UI already updated)
+    if (mealPlan) {
+      toggleAlreadyHaveItem(mealPlan.id, groceryName);
+    }
   }
 
   // ---- Render -------------------------------------------------------------
