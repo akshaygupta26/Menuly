@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { addDays, format, parseISO } from "date-fns";
+import { useMemo, useState } from "react";
+import { addDays, parseISO } from "date-fns";
 import { Plus, X, Sparkles, Lock, Unlock, ShoppingCart, CalendarDays, Trash2, Flame, GripVertical } from "lucide-react";
 import {
   DragDropContext,
@@ -20,6 +20,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DayAccordion } from "@/components/meal-plan/day-accordion";
+import { RecipeGroceryItems } from "@/components/meal-plan/recipe-grocery-items";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,6 +47,8 @@ interface WeekGridProps {
   onAutoGenerate: () => void;
   onGenerateGroceryList: () => void;
   isPending?: boolean;
+  alreadyHaveItems: string[];
+  onToggleAlreadyHave: (groceryName: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -282,9 +286,17 @@ export function WeekGrid({
   onAutoGenerate,
   onGenerateGroceryList,
   isPending = false,
+  alreadyHaveItems,
+  onToggleAlreadyHave,
 }: WeekGridProps) {
   const dayDates = useMemo(() => buildDayDates(weekStart), [weekStart]);
   const isFinalized = mealPlan?.status === "finalized";
+
+  // Accordion expand state — default to today's day expanded
+  const [expandedDays, setExpandedDays] = useState<Set<number>>(() => {
+    const today = new Date().getDay(); // 0=Sun
+    return new Set([today]);
+  });
 
   // Index items by "dayOfWeek-mealSlot" for O(1) lookup
   const itemsByKey = useMemo(() => {
@@ -497,127 +509,82 @@ export function WeekGrid({
         )}
 
         {/* ----------------------------------------------------------------- */}
-        {/* Desktop grid (hidden on mobile) */}
+        {/* Day accordions */}
         {/* ----------------------------------------------------------------- */}
-        <div className="hidden md:block overflow-x-auto">
-          <div
-            className="grid min-w-[700px] gap-px rounded-lg border border-border bg-border"
-            style={{ gridTemplateColumns: `repeat(7, minmax(0, 1fr))` }}
-          >
-            {/* Day headers */}
-            {dayDates.map(({ dayOfWeek, date }) => (
-              <div
-                key={`header-${dayOfWeek}`}
-                className="bg-muted/50 px-2 py-2 text-center"
+        <div className="space-y-2">
+          {dayDates.map(({ dayOfWeek, date }, dayIndex) => {
+            const dayItems = mealPlan?.items?.filter(
+              (i) => i.day_of_week === dayOfWeek
+            ) ?? [];
+            const isExpanded = expandedDays.has(dayOfWeek);
+            const totals = dayTotals.get(dayOfWeek);
+
+            return (
+              <DayAccordion
+                key={dayOfWeek}
+                dayOfWeek={dayOfWeek}
+                date={date}
+                items={dayItems}
+                mealSlots={mealSlots}
+                isFinalized={isFinalized}
+                isExpanded={isExpanded}
+                onToggleExpand={() => {
+                  setExpandedDays((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(dayOfWeek)) {
+                      next.delete(dayOfWeek);
+                    } else {
+                      next.add(dayOfWeek);
+                    }
+                    return next;
+                  });
+                }}
+                isFirst={dayIndex === 0}
               >
-                <div className="text-xs font-medium text-muted-foreground">
-                  {format(date, "EEE")}
-                </div>
-                <div className="text-sm font-semibold">
-                  {format(date, "MMM d")}
-                </div>
-              </div>
-            ))}
+                {/* Meal slots inside the accordion */}
+                <div className="divide-y divide-border px-3 pb-2">
+                  {mealSlots.map((slot, slotIndex) => {
+                    const item = itemsByKey.get(`${dayOfWeek}-${slot}`);
+                    const isFirstSlot = dayIndex === 0 && slotIndex === 0;
 
-            {/* Meal slot rows */}
-            {mealSlots.map((slot, slotIndex) =>
-              dayDates.map(({ dayOfWeek }, dayIndex) => {
-                const item = itemsByKey.get(`${dayOfWeek}-${slot}`);
-                const isFirstCell = slotIndex === 0 && dayIndex === 0;
-                return (
-                  <div
-                    key={`${dayOfWeek}-${slot}`}
-                    className="flex min-w-0 flex-col gap-1 bg-background p-1.5"
-                    {...(isFirstCell ? { "data-onboarding": "meal-slot" } : {})}
-                  >
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-                      {SLOT_LABELS[slot]}
-                    </span>
-                    {renderDndSlot(dayOfWeek, slot, item)}
-                  </div>
-                );
-              })
-            )}
+                    return (
+                      <div
+                        key={`${dayOfWeek}-${slot}`}
+                        className="py-2"
+                        {...(isFirstSlot ? { "data-onboarding": "meal-slot" } : {})}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-16 shrink-0 text-[11px] sm:text-xs font-medium text-muted-foreground">
+                            {SLOT_LABELS[slot]}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            {renderDndSlot(dayOfWeek, slot, item)}
+                          </div>
+                        </div>
 
-            {/* Day nutrition totals row */}
-            {dayDates.map(({ dayOfWeek }) => {
-              const totals = dayTotals.get(dayOfWeek);
-              return (
-                <div
-                  key={`totals-${dayOfWeek}`}
-                  className="flex items-center justify-center bg-muted/30 p-1.5"
-                >
-                  {totals ? (
-                    <DayNutritionSummary totals={totals} compact />
-                  ) : (
-                    <span className="text-[10px] text-muted-foreground/40">--</span>
+                        {/* Recipe grocery items — show ingredients under each filled slot */}
+                        {item?.recipe?.recipe_ingredients && item.recipe.recipe_ingredients.length > 0 && (
+                          <RecipeGroceryItems
+                            ingredients={item.recipe.recipe_ingredients}
+                            alreadyHaveItems={alreadyHaveItems}
+                            onToggleAlreadyHave={onToggleAlreadyHave}
+                            isFinalized={isFinalized}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Day nutrition totals */}
+                  {totals && (
+                    <div className="pt-2">
+                      <DayNutritionSummary totals={totals} />
+                    </div>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ----------------------------------------------------------------- */}
-        {/* Mobile vertical list (hidden on desktop) */}
-        {/* ----------------------------------------------------------------- */}
-        <div className="space-y-3 overflow-x-hidden md:hidden">
-          {dayDates.map(({ dayOfWeek, date }) => (
-            <div
-              key={`mobile-${dayOfWeek}`}
-              className="rounded-lg border border-border"
-            >
-              {/* Day header */}
-              <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-2">
-                <span className="text-sm font-semibold">
-                  {format(date, "EEE")}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {format(date, "MMM d")}
-                </span>
-              </div>
-
-              {/* Slots */}
-              <div className="divide-y divide-border">
-                {mealSlots.map((slot) => {
-                  const item = itemsByKey.get(`${dayOfWeek}-${slot}`);
-                  return (
-                    <div
-                      key={`${dayOfWeek}-${slot}`}
-                      className="flex items-center gap-3 px-3 py-2"
-                    >
-                      <span className="w-14 shrink-0 text-[11px] sm:text-xs font-medium text-muted-foreground">
-                        {SLOT_LABELS[slot]}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <MealSlotCell
-                          item={item}
-                          mealSlot={slot}
-                          dayOfWeek={dayOfWeek}
-                          isFinalized={isFinalized}
-                          onAdd={() => onAddItem(dayOfWeek, slot)}
-                          onSuggest={onSuggestItem ? () => onSuggestItem(dayOfWeek, slot) : undefined}
-                          onRemove={onRemoveItem}
-                          onReplace={item && onReplaceItem ? () => onReplaceItem(dayOfWeek, slot, item.id) : undefined}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Day nutrition totals footer */}
-              {(() => {
-                const totals = dayTotals.get(dayOfWeek);
-                if (!totals) return null;
-                return (
-                  <div className="border-t bg-muted/30 px-3 py-2">
-                    <DayNutritionSummary totals={totals} />
-                  </div>
-                );
-              })()}
-            </div>
-          ))}
+              </DayAccordion>
+            );
+          })}
         </div>
       </div>
     </DragDropContext>

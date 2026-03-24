@@ -70,6 +70,12 @@ export function MealPlanClient({
     initialMealPlan
   );
 
+  // "Already have" items — ingredients the user already has at home.
+  // Will be persisted via server action in Phase 3 (Task 13).
+  const [alreadyHaveItems, setAlreadyHaveItems] = useState<string[]>(
+    ((mealPlan as unknown as Record<string, unknown>)?.already_have_items as string[] | undefined) ?? []
+  );
+
   // Sync server-refreshed data into local state.
   // router.refresh() re-runs the server component, which passes new
   // initialMealPlan — this effect picks up the change.
@@ -332,6 +338,15 @@ export function MealPlanClient({
     });
   }
 
+  function handleToggleAlreadyHave(groceryName: string) {
+    setAlreadyHaveItems((prev) =>
+      prev.includes(groceryName)
+        ? prev.filter((item) => item !== groceryName)
+        : [...prev, groceryName]
+    );
+    // TODO: Wire to toggleAlreadyHaveItem server action in Phase 3
+  }
+
   // ---- Render -------------------------------------------------------------
 
   return (
@@ -352,6 +367,8 @@ export function MealPlanClient({
         onAutoGenerate={handleAutoGenerate}
         onGenerateGroceryList={handleGenerateGroceryList}
         isPending={isPending}
+        alreadyHaveItems={alreadyHaveItems}
+        onToggleAlreadyHave={handleToggleAlreadyHave}
       />
 
       <RecipePickerDialog
