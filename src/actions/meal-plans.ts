@@ -109,7 +109,7 @@ export async function getMealPlan(
   // Fetch items with joined recipes
   const { data: items, error: itemsError } = await supabase
     .from("meal_plan_items")
-    .select("*, recipe:recipes(*)")
+    .select("*, recipe:recipes(*, recipe_ingredients(*))")
     .eq("meal_plan_id", mealPlan.id)
     .order("day_of_week")
     .order("meal_slot");
@@ -635,4 +635,50 @@ export async function getRecipesForPicker(
   }
 
   return { data: (data ?? []) as PickerRecipe[], error: null };
+}
+
+// ---------------------------------------------------------------------------
+// 12. toggleAlreadyHaveItem
+// ---------------------------------------------------------------------------
+
+export async function toggleAlreadyHaveItem(
+  mealPlanId: string,
+  groceryName: string
+): Promise<ActionResult> {
+  const { supabase, user } = await getAuthenticatedUser();
+  if (!supabase || !user) {
+    return { data: null, error: "Not authenticated" };
+  }
+
+  const ctx = await getHouseholdContext(supabase, user.id);
+
+  // Verify ownership
+  const { data: mealPlan, error: fetchError } = await applyOwnershipFilter(
+    supabase.from("meal_plans").select("id, already_have_items").eq("id", mealPlanId),
+    ctx
+  ).single();
+
+  if (fetchError || !mealPlan) {
+    return { data: null, error: "Meal plan not found" };
+  }
+
+  const current: string[] = (mealPlan.already_have_items as string[]) ?? [];
+  const key = groceryName.toLowerCase();
+
+  const updated = current.includes(key)
+    ? current.filter((item) => item !== key)
+    : [...current, key];
+
+  const { error: updateError } = await supabase
+    .from("meal_plans")
+    .update({ already_have_items: updated })
+    .eq("id", mealPlanId);
+
+  if (updateError) {
+    return { data: null, error: updateError.message };
+  }
+
+  revalidatePath("/plan");
+
+  return { data: null, error: null };
 }

@@ -61,9 +61,9 @@ export const ONBOARDING_CONFIG: Record<OnboardingPage, OnboardingPageConfig> = {
   plan: {
     banner: {
       icon: "📅",
-      title: "Plan your week with smart rotation",
+      title: "Plan your week and mark what you have",
       description:
-        "Auto-generate a balanced meal plan that avoids repeating recent meals and mixes up cuisines and proteins.",
+        "Expand any day to see your meals and their ingredients. Mark items you already have at home \u2014 they\u2019ll be excluded from your grocery list.",
     },
     spotlights: [
       {
@@ -73,10 +73,16 @@ export const ONBOARDING_CONFIG: Record<OnboardingPage, OnboardingPageConfig> = {
           "Fills your week using smart rotation — it avoids repeating recent meals and mixes cuisines & proteins.",
       },
       {
-        target: "meal-slot",
-        title: "Drag to Rearrange",
+        target: "day-accordion",
+        title: "Expand a Day",
         description:
-          "Swap meals between slots by dragging, or click a slot to pick a different recipe.",
+          "Tap a day to see your meals and the grocery items you\u2019ll need. Mark anything you already have at home.",
+      },
+      {
+        target: "already-have",
+        title: "Already Have It?",
+        description:
+          "Check off ingredients you already have. This applies to the whole week \u2014 if garlic is needed in multiple recipes, checking it once excludes it from your grocery list.",
       },
       {
         target: "finalize-plan",
@@ -91,7 +97,7 @@ export const ONBOARDING_CONFIG: Record<OnboardingPage, OnboardingPageConfig> = {
       icon: "🛒",
       title: "Your consolidated shopping list",
       description:
-        "Generated from your finalized meal plan — ingredients are grouped by category and quantities are combined across recipes.",
+        "Generated from your finalized meal plan \u2014 ingredients you marked as \u2018already have\u2019 are excluded. Quantities are combined across recipes.",
     },
     spotlights: [
       {

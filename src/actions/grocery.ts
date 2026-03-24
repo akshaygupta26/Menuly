@@ -8,12 +8,6 @@ import type {
   GroceryItem,
   IngredientCategory,
 } from "@/types/database";
-import {
-  consolidateIngredients,
-  recipeIngredientsToInputs,
-} from "@/lib/grocery-consolidator";
-import type { ConsolidationInput, GroupedGroceryItems } from "@/lib/grocery-consolidator";
-import { aiConsolidateIngredients } from "@/lib/ai-grocery-consolidator";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -116,7 +110,7 @@ export async function generateGroceryList(
     return { data: null, error: "Meal plan must be finalized first" };
   }
 
-  // Fetch all meal plan items with recipe_ids
+  // Fetch all meal plan items (do NOT deduplicate — each occurrence contributes full quantities)
   const { data: planItems, error: itemsError } = await supabase
     .from("meal_plan_items")
     .select("recipe_id")
@@ -127,106 +121,128 @@ export async function generateGroceryList(
     return { data: null, error: itemsError.message };
   }
 
-  // Get unique recipe IDs
-  const recipeIds = [
-    ...new Set(
-      (planItems ?? [])
-        .map((item) => item.recipe_id)
-        .filter((id): id is string => id != null)
-    ),
-  ];
+  // Collect ALL recipe_ids (including duplicates for recipes used multiple times)
+  const allRecipeIds = (planItems ?? [])
+    .map((item) => item.recipe_id)
+    .filter((id): id is string => id != null);
 
-  if (recipeIds.length === 0) {
+  if (allRecipeIds.length === 0) {
     return { data: null, error: "No recipes found in meal plan" };
   }
 
-  // Fetch all ingredients for those recipes
+  // Fetch ingredients for unique recipes
+  const uniqueRecipeIds = [...new Set(allRecipeIds)];
   const { data: allIngredients, error: ingredientsError } = await supabase
     .from("recipe_ingredients")
     .select("*")
-    .in("recipe_id", recipeIds);
+    .in("recipe_id", uniqueRecipeIds);
 
   if (ingredientsError) {
     return { data: null, error: ingredientsError.message };
   }
 
-  // Fetch recipe metadata for AI prompt
-  const { data: recipes } = await supabase
-    .from("recipes")
-    .select("id, name, servings")
-    .in("id", recipeIds);
+  // Build a map of recipe_id → ingredients
+  const ingredientsByRecipe = new Map<string, typeof allIngredients>();
+  for (const ing of allIngredients ?? []) {
+    const list = ingredientsByRecipe.get(ing.recipe_id) ?? [];
+    list.push(ing);
+    ingredientsByRecipe.set(ing.recipe_id, list);
+  }
 
-  // Regex-based fallback consolidator
-  const regexConsolidate = (): GroupedGroceryItems[] => {
-    const inputs: ConsolidationInput[] = [];
-    for (const ing of allIngredients ?? []) {
-      inputs.push(...recipeIngredientsToInputs([ing], ing.recipe_id));
-    }
-    return consolidateIngredients(inputs);
-  };
+  // Fetch already_have_items from meal plan
+  const { data: planData } = await supabase
+    .from("meal_plans")
+    .select("already_have_items")
+    .eq("id", mealPlanId)
+    .single();
+  const alreadyHave = new Set<string>(
+    ((planData?.already_have_items as string[]) ?? []).map((s) => s.toLowerCase())
+  );
 
-  // Try AI consolidation first, fallback to regex
-  let grouped: GroupedGroceryItems[];
-  const aiConfigured =
-    process.env.AI_API_KEY && process.env.AI_BASE_URL && process.env.AI_MODEL;
+  // Consolidate: group by grocery_name (or fallback to name), sum quantities
+  const CATEGORY_ORDER: IngredientCategory[] = [
+    "produce", "meat", "dairy", "bakery", "frozen", "pantry", "beverages", "other",
+  ];
 
-  if (aiConfigured && recipes && recipes.length > 0) {
-    // Check rate limit
-    let canUseAI = false;
-    let currentCount = 0;
+  interface ConsolidatedItem {
+    name: string;
+    quantity: number | null;
+    unit: string | null;
+    category: IngredientCategory;
+    recipeIds: Set<string>;
+  }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("ai_generation_count, ai_generation_reset_at, ai_unlimited")
-      .eq("user_id", user.id)
-      .single();
+  const consolidated = new Map<string, ConsolidatedItem>();
 
-    if (profile) {
-      currentCount = profile.ai_generation_count as number;
-      const DAILY_LIMIT = 3;
+  // For each meal plan item occurrence (not deduplicated), add its recipe's ingredients
+  for (const recipeId of allRecipeIds) {
+    const ingredients = ingredientsByRecipe.get(recipeId) ?? [];
+    for (const ing of ingredients) {
+      const displayName = ing.grocery_name ?? ing.name;
+      const key = displayName.toLowerCase();
 
-      if (profile.ai_unlimited) {
-        canUseAI = true;
-      } else {
-        const resetAt = new Date(profile.ai_generation_reset_at as string);
-        const now = new Date();
-        const msIn24h = 24 * 60 * 60 * 1000;
+      // Skip already-have items
+      if (alreadyHave.has(key)) continue;
 
-        if (now.getTime() - resetAt.getTime() >= msIn24h) {
-          await supabase
-            .from("profiles")
-            .update({
-              ai_generation_count: 0,
-              ai_generation_reset_at: now.toISOString(),
-            })
-            .eq("user_id", user.id);
-          currentCount = 0;
+      const existing = consolidated.get(key);
+      const qty = ing.grocery_quantity ?? ing.quantity;
+      const unit = ing.grocery_unit ?? ing.unit;
+      const category = (ing.grocery_category ?? ing.category) as IngredientCategory;
+
+      if (existing) {
+        // Sum quantities if both have values and units match
+        if (existing.quantity != null && qty != null && existing.unit === unit) {
+          existing.quantity += qty;
+        } else if (existing.quantity == null && qty != null) {
+          existing.quantity = qty;
+          existing.unit = unit;
         }
-
-        canUseAI = currentCount < DAILY_LIMIT;
+        existing.recipeIds.add(ing.recipe_id);
+      } else {
+        consolidated.set(key, {
+          name: displayName,
+          quantity: qty,
+          unit,
+          category,
+          recipeIds: new Set([ing.recipe_id]),
+        });
       }
     }
+  }
 
-    if (canUseAI) {
-      try {
-        grouped = await aiConsolidateIngredients(
-          recipes as { id: string; name: string; servings: number | null }[],
-          (allIngredients ?? []) as import("@/types/database").RecipeIngredient[]
-        );
-        // Increment AI usage count on success
-        await supabase
-          .from("profiles")
-          .update({ ai_generation_count: currentCount + 1 })
-          .eq("user_id", user.id);
-      } catch {
-        // AI failed — silent fallback to regex consolidator
-        grouped = regexConsolidate();
-      }
-    } else {
-      grouped = regexConsolidate();
+  // Clean up stale already_have_items (remove entries not matching any ingredient)
+  const allIngredientKeys = new Set<string>();
+  for (const recipeId of allRecipeIds) {
+    for (const ing of ingredientsByRecipe.get(recipeId) ?? []) {
+      allIngredientKeys.add((ing.grocery_name ?? ing.name).toLowerCase());
     }
-  } else {
-    grouped = regexConsolidate();
+  }
+  const cleanedAlreadyHave = [...alreadyHave].filter((item) => allIngredientKeys.has(item));
+  if (cleanedAlreadyHave.length !== alreadyHave.size) {
+    await supabase
+      .from("meal_plans")
+      .update({ already_have_items: cleanedAlreadyHave })
+      .eq("id", mealPlanId);
+  }
+
+  // Group by category in standard order
+  type GroupedItems = { category: IngredientCategory; items: { name: string; quantity: number | null; unit: string | null; category: IngredientCategory; recipe_ids: string[] }[] };
+  const grouped: GroupedItems[] = [];
+
+  for (const cat of CATEGORY_ORDER) {
+    const items = [...consolidated.values()]
+      .filter((item) => item.category === cat)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        category: item.category,
+        recipe_ids: [...item.recipeIds],
+      }));
+    if (items.length > 0) {
+      grouped.push({ category: cat, items });
+    }
   }
 
   // Deactivate any existing active grocery lists

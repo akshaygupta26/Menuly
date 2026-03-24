@@ -19,6 +19,7 @@ import {
   clearMealPlanSlot,
   finalizeMealPlan,
   unfinalizeMealPlan,
+  toggleAlreadyHaveItem,
 } from "@/actions/meal-plans";
 import { generateGroceryList } from "@/actions/grocery";
 import { WeekGrid } from "@/components/meal-plan/week-grid";
@@ -68,6 +69,11 @@ export function MealPlanClient({
   const [isPending, startTransition] = useTransition();
   const [mealPlan, setMealPlan] = useState<MealPlanWithItems | null>(
     initialMealPlan
+  );
+
+  // "Already have" items — ingredients the user already has at home.
+  const [alreadyHaveItems, setAlreadyHaveItems] = useState<string[]>(
+    mealPlan?.already_have_items ?? []
   );
 
   // Sync server-refreshed data into local state.
@@ -332,6 +338,18 @@ export function MealPlanClient({
     });
   }
 
+  function handleToggleAlreadyHave(groceryName: string) {
+    setAlreadyHaveItems((prev) =>
+      prev.includes(groceryName)
+        ? prev.filter((item) => item !== groceryName)
+        : [...prev, groceryName]
+    );
+    // Persist to server (fire-and-forget, optimistic UI already updated)
+    if (mealPlan) {
+      toggleAlreadyHaveItem(mealPlan.id, groceryName);
+    }
+  }
+
   // ---- Render -------------------------------------------------------------
 
   return (
@@ -352,6 +370,8 @@ export function MealPlanClient({
         onAutoGenerate={handleAutoGenerate}
         onGenerateGroceryList={handleGenerateGroceryList}
         isPending={isPending}
+        alreadyHaveItems={alreadyHaveItems}
+        onToggleAlreadyHave={handleToggleAlreadyHave}
       />
 
       <RecipePickerDialog

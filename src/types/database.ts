@@ -98,6 +98,7 @@ export interface Recipe {
   nutrition_source: NutritionSource | null;
   created_at: string;
   updated_at: string;
+  grocery_normalized_at: string | null;
 }
 
 export interface RecipeIngredient {
@@ -111,6 +112,10 @@ export interface RecipeIngredient {
   is_optional: boolean;
   raw_text: string;
   sort_order: number;
+  grocery_name: string | null;
+  grocery_quantity: number | null;
+  grocery_unit: string | null;
+  grocery_category: string | null;
 }
 
 export interface RecipeHistory {
@@ -130,6 +135,7 @@ export interface MealPlan {
   household_id: string | null;
   week_start: string;
   status: MealPlanStatus;
+  already_have_items: string[];
   created_at: string;
   updated_at: string;
 }
@@ -145,7 +151,7 @@ export interface MealPlanItem {
 }
 
 export interface MealPlanItemWithRecipe extends MealPlanItem {
-  recipe: Recipe | null;
+  recipe: (Recipe & { recipe_ingredients: RecipeIngredient[] }) | null;
 }
 
 export interface GroceryList {
