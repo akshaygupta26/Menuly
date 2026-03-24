@@ -150,7 +150,7 @@ export interface MealPlanItem {
 }
 
 export interface MealPlanItemWithRecipe extends MealPlanItem {
-  recipe: Recipe | null;
+  recipe: (Recipe & { recipe_ingredients: RecipeIngredient[] }) | null;
 }
 
 export interface GroceryList {

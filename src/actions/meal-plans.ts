@@ -109,7 +109,7 @@ export async function getMealPlan(
   // Fetch items with joined recipes
   const { data: items, error: itemsError } = await supabase
     .from("meal_plan_items")
-    .select("*, recipe:recipes(*)")
+    .select("*, recipe:recipes(*, recipe_ingredients(*))")
     .eq("meal_plan_id", mealPlan.id)
     .order("day_of_week")
     .order("meal_slot");
