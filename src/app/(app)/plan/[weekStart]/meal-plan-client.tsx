@@ -71,9 +71,8 @@ export function MealPlanClient({
   );
 
   // "Already have" items — ingredients the user already has at home.
-  // Will be persisted via server action in Phase 3 (Task 13).
   const [alreadyHaveItems, setAlreadyHaveItems] = useState<string[]>(
-    ((mealPlan as unknown as Record<string, unknown>)?.already_have_items as string[] | undefined) ?? []
+    mealPlan?.already_have_items ?? []
   );
 
   // Sync server-refreshed data into local state.

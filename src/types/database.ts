@@ -135,6 +135,7 @@ export interface MealPlan {
   household_id: string | null;
   week_start: string;
   status: MealPlanStatus;
+  already_have_items: string[];
   created_at: string;
   updated_at: string;
 }
