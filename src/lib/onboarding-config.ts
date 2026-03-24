@@ -97,7 +97,7 @@ export const ONBOARDING_CONFIG: Record<OnboardingPage, OnboardingPageConfig> = {
       icon: "🛒",
       title: "Your consolidated shopping list",
       description:
-        "Generated from your finalized meal plan — ingredients are grouped by category and quantities are combined across recipes.",
+        "Generated from your finalized meal plan \u2014 ingredients you marked as \u2018already have\u2019 are excluded. Quantities are combined across recipes.",
     },
     spotlights: [
       {
