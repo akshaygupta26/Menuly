@@ -10,6 +10,7 @@ import {
   LogOut,
   Loader2,
   Smartphone,
+  Sparkles,
   UtensilsCrossed,
   User,
 } from "lucide-react";
@@ -72,6 +73,8 @@ export default function SettingsPage() {
   const [isDietaryPending, startDietaryTransition] = useTransition();
   const [isAllergyPending, startAllergyTransition] = useTransition();
   const [isResetting, startResetTransition] = useTransition();
+  const [isNormalizing, setIsNormalizing] = useState(false);
+  const [normalizeProgress, setNormalizeProgress] = useState<{ processed: number; total: number } | null>(null);
 
   // Profile / Meal slots
   const [mealSlots, setMealSlots] = useState<MealType[]>([]);
@@ -209,6 +212,46 @@ export default function SettingsPage() {
       }
       router.push("/onboarding");
     });
+  };
+
+  const handleNormalizeRecipes = async () => {
+    setIsNormalizing(true);
+    setNormalizeProgress(null);
+    let totalProcessed = 0;
+    let totalFailed = 0;
+
+    try {
+      // Call in a loop until no remaining recipes
+      while (true) {
+        const res = await fetch("/api/recipes/normalize-all", { method: "POST" });
+        if (!res.ok) {
+          toast.error("Failed to normalize recipes");
+          break;
+        }
+        const data = await res.json();
+        totalProcessed += data.processed;
+        totalFailed += data.failed;
+        setNormalizeProgress({
+          processed: totalProcessed,
+          total: totalProcessed + totalFailed + data.remaining,
+        });
+
+        if (data.remaining === 0) break;
+      }
+
+      if (totalProcessed > 0) {
+        toast.success(`Normalized ${totalProcessed} recipe${totalProcessed === 1 ? "" : "s"}`);
+      } else {
+        toast.info("All recipes are already normalized");
+      }
+      if (totalFailed > 0) {
+        toast.warning(`${totalFailed} recipe${totalFailed === 1 ? "" : "s"} failed to normalize`);
+      }
+    } catch {
+      toast.error("Something went wrong while normalizing");
+    } finally {
+      setIsNormalizing(false);
+    }
   };
 
   // ---- Derived values ------------------------------------------------------
@@ -578,6 +621,37 @@ export default function SettingsPage() {
               {isResetting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Replay Onboarding
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* ================================================================ */}
+        {/* Normalize Recipes                                                */}
+        {/* ================================================================ */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="size-5 text-primary" />
+              Smart Grocery Names
+            </CardTitle>
+            <CardDescription>
+              Updates your recipes with clean grocery names for better shopping lists.
+              New recipes are normalized automatically.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button
+              variant="outline"
+              onClick={handleNormalizeRecipes}
+              disabled={isNormalizing}
+            >
+              {isNormalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isNormalizing ? "Normalizing..." : "Normalize All Recipes"}
+            </Button>
+            {normalizeProgress && (
+              <p className="text-sm text-muted-foreground">
+                {normalizeProgress.processed} / {normalizeProgress.total} recipes processed
+              </p>
+            )}
           </CardContent>
         </Card>
 
