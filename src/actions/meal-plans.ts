@@ -175,7 +175,7 @@ export async function addMealPlanItem(
     return { data: null, error: insertError.message };
   }
 
-  revalidatePath("/meal-plan");
+  revalidatePath("/plan");
 
   return { data: item as MealPlanItem, error: null };
 }
@@ -240,7 +240,7 @@ export async function updateMealPlanItem(
     return { data: null, error: updateError.message };
   }
 
-  revalidatePath("/meal-plan");
+  revalidatePath("/plan");
 
   return { data: updated as MealPlanItem, error: null };
 }
@@ -291,7 +291,7 @@ export async function removeMealPlanItem(
     return { data: null, error: deleteError.message };
   }
 
-  revalidatePath("/meal-plan");
+  revalidatePath("/plan");
 
   return { data: null, error: null };
 }
@@ -371,7 +371,7 @@ export async function finalizeMealPlan(
     return { data: null, error: updateError.message };
   }
 
-  revalidatePath("/meal-plan");
+  revalidatePath("/plan");
   revalidatePath("/recipes");
 
   return { data: null, error: null };
@@ -417,7 +417,7 @@ export async function unfinalizeMealPlan(
     return { data: null, error: updateError.message };
   }
 
-  revalidatePath("/meal-plan");
+  revalidatePath("/plan");
 
   return { data: null, error: null };
 }
@@ -462,7 +462,7 @@ export async function clearAllMealPlanItems(
     return { data: null, error: deleteError.message };
   }
 
-  revalidatePath("/meal-plan");
+  revalidatePath("/plan");
 
   return { data: null, error: null };
 }
@@ -509,7 +509,7 @@ export async function clearMealPlanSlot(
     return { data: null, error: deleteError.message };
   }
 
-  revalidatePath("/meal-plan");
+  revalidatePath("/plan");
 
   return { data: null, error: null };
 }

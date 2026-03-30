@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Check, ChevronDown, ChevronRight, ListX, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -70,11 +70,6 @@ interface GroceryListViewProps {
   initialItems: GroceryItem[];
 }
 
-type OptimisticAction =
-  | { type: "add"; item: GroceryItem }
-  | { type: "remove"; itemId: string }
-  | { type: "toggle"; id: string }
-  | { type: "sync"; items: GroceryItem[] };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -101,29 +96,14 @@ function formatQuantity(item: GroceryItem): string {
   return item.unit ? `${qty} ${item.unit}` : qty;
 }
 
-function itemsReducer(items: GroceryItem[], action: OptimisticAction): GroceryItem[] {
-  switch (action.type) {
-    case "add":
-      return [...items, action.item];
-    case "remove":
-      return items.filter((item) => item.id !== action.itemId);
-    case "toggle":
-      return items.map((item) =>
-        item.id === action.id ? { ...item, is_checked: !item.is_checked } : item
-      );
-    case "sync":
-      return action.items;
-    default:
-      return items;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export function GroceryListView({ initialList, initialItems }: GroceryListViewProps) {
-  const [optimisticItems, dispatchOptimistic] = useOptimistic(initialItems, itemsReducer);
+  const [items, setItems] = useState<GroceryItem[]>(initialItems);
+  const pendingTogglesRef = useRef(new Set<string>());
   const [collapsedCategories, setCollapsedCategories] = useState<Set<IngredientCategory>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -136,6 +116,21 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
   const [isPending, startTransition] = useTransition();
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
   const dismissTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // ---- Sync server-rendered data into local state ----
+  useEffect(() => {
+    setItems(prev => {
+      if (pendingTogglesRef.current.size === 0) return initialItems;
+      // Preserve optimistic toggle states for items being toggled
+      return initialItems.map(item => {
+        if (pendingTogglesRef.current.has(item.id)) {
+          const local = prev.find(i => i.id === item.id);
+          return local ? { ...item, is_checked: local.is_checked } : item;
+        }
+        return item;
+      });
+    });
+  }, [initialItems]);
 
   // ---- Realtime subscription ----
   useEffect(() => {
@@ -161,8 +156,17 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
             .order("sort_order")
             .then(({ data }) => {
               if (data) {
-                startTransition(() => {
-                  dispatchOptimistic({ type: "sync", items: data as GroceryItem[] });
+                setItems(prev => {
+                  const newItems = data as GroceryItem[];
+                  if (pendingTogglesRef.current.size === 0) return newItems;
+                  // Preserve optimistic toggle states for items being toggled
+                  return newItems.map(item => {
+                    if (pendingTogglesRef.current.has(item.id)) {
+                      const local = prev.find(i => i.id === item.id);
+                      return local ? { ...item, is_checked: local.is_checked } : item;
+                    }
+                    return item;
+                  });
                 });
               }
             });
@@ -173,12 +177,12 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [initialList.id, dispatchOptimistic]);
+  }, [initialList.id]);
 
   // ---- Derived state ----
-  const grouped = useMemo(() => groupByCategory(optimisticItems), [optimisticItems]);
-  const totalCount = optimisticItems.length;
-  const checkedCount = optimisticItems.filter((i) => i.is_checked).length;
+  const grouped = useMemo(() => groupByCategory(items), [items]);
+  const totalCount = items.length;
+  const checkedCount = items.filter((i) => i.is_checked).length;
 
   // Auto-collapse categories where all items are checked (merged with user-collapsed set)
   const effectiveCollapsed = useMemo(() => {
@@ -220,20 +224,26 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
 
   const handleCheck = useCallback(
     (item: GroceryItem) => {
+      // Mark as pending so Realtime sync won't overwrite
+      pendingTogglesRef.current.add(item.id);
+
       // Optimistic update immediately
-      startTransition(() => {
-        dispatchOptimistic({ type: "toggle", id: item.id });
-      });
+      setItems(prev =>
+        prev.map(i => i.id === item.id ? { ...i, is_checked: !i.is_checked } : i)
+      );
 
       // Show undo toast
       toast(`✓ ${item.name} ${item.is_checked ? "unchecked" : "checked off"}`, {
         action: {
           label: "Undo",
           onClick: () => {
-            startTransition(() => {
-              dispatchOptimistic({ type: "toggle", id: item.id });
+            pendingTogglesRef.current.add(item.id);
+            setItems(prev =>
+              prev.map(i => i.id === item.id ? { ...i, is_checked: !i.is_checked } : i)
+            );
+            toggleGroceryItem(item.id).then(() => {
+              pendingTogglesRef.current.delete(item.id);
             });
-            toggleGroceryItem(item.id); // Toggle back on server
           },
         },
         duration: 3000,
@@ -241,15 +251,16 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
 
       // Call server action async (don't await for UI)
       toggleGroceryItem(item.id).then((result) => {
+        pendingTogglesRef.current.delete(item.id);
         if (result.error) {
-          startTransition(() => {
-            dispatchOptimistic({ type: "toggle", id: item.id }); // revert
-          });
+          setItems(prev =>
+            prev.map(i => i.id === item.id ? { ...i, is_checked: !i.is_checked } : i)
+          );
           toast.error("Failed to update");
         }
       });
     },
-    [dispatchOptimistic]
+    []
   );
 
   const handleAdd = useCallback(
@@ -266,15 +277,15 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
 
   const handleRemove = useCallback(
     (itemId: string) => {
+      setItems(prev => prev.filter(i => i.id !== itemId));
       startTransition(async () => {
-        dispatchOptimistic({ type: "remove", itemId });
         const result = await removeGroceryItem(itemId);
         if (result.error) {
           toast.error("Failed to remove item");
         }
       });
     },
-    [dispatchOptimistic]
+    []
   );
 
   // ---- Render ----
@@ -447,7 +458,7 @@ export function GroceryListView({ initialList, initialItems }: GroceryListViewPr
               onClick={() => {
                 setShowClearAllConfirm(false);
                 startTransition(async () => {
-                  dispatchOptimistic({ type: "sync", items: [] });
+                  setItems([]);
                   const result = await clearGroceryList(initialList.id);
                   if (result.error) {
                     toast.error("Failed to clear list");

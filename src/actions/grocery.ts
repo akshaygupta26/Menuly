@@ -347,6 +347,8 @@ export async function toggleGroceryItem(
     return { data: null, error: updateError.message };
   }
 
+  revalidatePath("/grocery");
+
   return { data: { is_checked: newValue }, error: null };
 }
 
