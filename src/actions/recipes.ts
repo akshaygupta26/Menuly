@@ -9,7 +9,7 @@ import type {
   RecipeHistory,
   MealType,
 } from "@/types/database";
-import { normalizeIngredients } from "@/lib/ai-ingredient-normalizer";
+import { normalizeIngredientsWithCache } from "@/lib/ai-ingredient-normalizer-cached";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -208,7 +208,7 @@ export async function createRecipe(
         .eq("recipe_id", newRecipe.id);
 
       if (inserted && inserted.length > 0) {
-        const normalized = await normalizeIngredients(inserted);
+        const normalized = await normalizeIngredientsWithCache(supabase, inserted);
 
         for (const item of normalized) {
           await supabase
@@ -310,7 +310,7 @@ export async function updateRecipe(
         .eq("recipe_id", id);
 
       if (inserted && inserted.length > 0) {
-        const normalized = await normalizeIngredients(inserted);
+        const normalized = await normalizeIngredientsWithCache(supabase, inserted);
 
         for (const item of normalized) {
           await supabase
