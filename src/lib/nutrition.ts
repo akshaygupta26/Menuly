@@ -44,9 +44,12 @@ const NUTRIENT_FAT = 204;
 // L1 in-memory cache moved to src/lib/nutrition-cache.ts.
 
 /**
- * Search the USDA FoodData Central database for a food item.
+ * Direct USDA FoodData Central lookup — no caching at this layer.
+ * Production callers should use `searchUSDAFoodCached` from
+ * `@/lib/nutrition-cache`, which adds L1 in-memory + L2 Supabase caching
+ * and delegates to this function on miss.
+ *
  * Returns per-100g nutrient values, or null if not found.
- * Results are cached in-memory to avoid redundant API calls.
  */
 export async function searchUSDAFood(
   query: string
