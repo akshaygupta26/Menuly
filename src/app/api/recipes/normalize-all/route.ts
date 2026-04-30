@@ -4,7 +4,7 @@ import {
   getHouseholdContext,
   applyOwnershipFilter,
 } from "@/lib/household-context";
-import { normalizeIngredients } from "@/lib/ai-ingredient-normalizer";
+import { normalizeIngredientsWithCache } from "@/lib/ai-ingredient-normalizer-cached";
 
 // ---------------------------------------------------------------------------
 // POST /api/recipes/normalize-all
@@ -78,7 +78,8 @@ export async function POST() {
         }
 
         // Call the AI normalizer
-        const normalized = await normalizeIngredients(
+        const normalized = await normalizeIngredientsWithCache(
+          supabase,
           ingredients.map((ing) => ({ id: ing.id, raw_text: ing.raw_text ?? "" }))
         );
 

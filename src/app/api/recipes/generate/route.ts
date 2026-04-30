@@ -292,6 +292,7 @@ export async function POST(request: Request) {
 
             try {
               const nutrition = await calculateNutritionForIngredients(
+                supabase,
                 nutritionInputs,
                 servings
               );

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { createClient } from "@/lib/supabase/server";
 import { calculateNutritionWithBreakdown } from "@/lib/nutrition";
 
 interface CalculateRequestBody {
@@ -9,6 +10,7 @@ interface CalculateRequestBody {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const body: CalculateRequestBody = await request.json();
 
     if (!Array.isArray(body.ingredients) || body.ingredients.length === 0) {
@@ -24,6 +26,7 @@ export async function POST(request: NextRequest) {
         : 1;
 
     const result = await calculateNutritionWithBreakdown(
+      supabase,
       body.ingredients,
       servings
     );

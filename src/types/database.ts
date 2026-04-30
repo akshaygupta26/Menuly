@@ -197,3 +197,31 @@ export interface GroceryItem {
   sort_order: number;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Cache tables (013_external_call_caches.sql)
+// ---------------------------------------------------------------------------
+
+export interface IngredientNormalizationCacheEntry {
+  cache_key: string;
+  raw_text: string;
+  grocery_name: string;
+  grocery_quantity: number | null;
+  grocery_unit: string | null;
+  grocery_category: IngredientCategory;
+  prompt_version: number;
+  hit_count: number;
+  created_at: string;
+}
+
+export interface UsdaLookupCacheEntry {
+  cache_key: string;
+  original_query: string;
+  calories: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  usda_description: string | null;
+  hit_count: number;
+  created_at: string;
+}

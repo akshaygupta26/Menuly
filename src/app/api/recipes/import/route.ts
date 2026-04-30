@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { createClient } from "@/lib/supabase/server";
 import { scrapeRecipe } from "@/lib/recipe-scraper";
 import { parseIngredient } from "@/lib/ingredient-parser";
 import { calculateNutritionForIngredients } from "@/lib/nutrition";
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const body = await request.json();
     const { url } = body;
 
@@ -102,6 +104,7 @@ export async function POST(request: NextRequest) {
       try {
         const servings = scraped.servings ?? 1;
         const usdaNutrition = await calculateNutritionForIngredients(
+          supabase,
           parsedIngredients.map((ing) => ({
             name: ing.name,
             quantity: ing.quantity,

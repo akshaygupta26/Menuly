@@ -1,5 +1,8 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import type { NutritionInfo, IngredientNutritionDetail } from "@/types/database";
 import { convertToGrams } from "@/lib/unit-conversion";
+import { searchUSDAFoodCached } from "@/lib/nutrition-cache";
 
 // Re-export for backward compatibility
 export { convertToGrams } from "@/lib/unit-conversion";
@@ -38,17 +41,15 @@ const NUTRIENT_PROTEIN = 203;
 const NUTRIENT_CARBS = 205;
 const NUTRIENT_FAT = 204;
 
-// Module-level cache for USDA lookups (resets on redeploy)
-const usdaCache = new Map<string, NutritionInfo>();
-
-function normalizeKey(query: string): string {
-  return query.toLowerCase().trim();
-}
+// L1 in-memory cache moved to src/lib/nutrition-cache.ts.
 
 /**
- * Search the USDA FoodData Central database for a food item.
+ * Direct USDA FoodData Central lookup — no caching at this layer.
+ * Production callers should use `searchUSDAFoodCached` from
+ * `@/lib/nutrition-cache`, which adds L1 in-memory + L2 Supabase caching
+ * and delegates to this function on miss.
+ *
  * Returns per-100g nutrient values, or null if not found.
- * Results are cached in-memory to avoid redundant API calls.
  */
 export async function searchUSDAFood(
   query: string
@@ -57,12 +58,6 @@ export async function searchUSDAFood(
   if (!apiKey) {
     console.warn("USDA_API_KEY not set — skipping USDA lookup");
     return null;
-  }
-
-  const cacheKey = normalizeKey(query);
-  const cached = usdaCache.get(cacheKey);
-  if (cached) {
-    return cached;
   }
 
   const response = await fetch(
@@ -109,8 +104,6 @@ export async function searchUSDAFood(
     fat_g: getNutrient(NUTRIENT_FAT),
   };
 
-  usdaCache.set(cacheKey, result);
-
   return result;
 }
 
@@ -126,6 +119,7 @@ export async function searchUSDAFood(
  * (~1000 requests/hour).
  */
 export async function calculateNutritionForIngredients(
+  supabase: SupabaseClient,
   ingredients: IngredientInput[],
   servings: number
 ): Promise<NutritionInfo> {
@@ -139,7 +133,7 @@ export async function calculateNutritionForIngredients(
 
     const results = await Promise.all(
       batch.map(async (ing) => {
-        const per100g = await searchUSDAFood(ing.name);
+        const per100g = await searchUSDAFoodCached(supabase, ing.name);
         if (!per100g) return null;
 
         const grams = convertToGrams(ing.quantity, ing.unit);
@@ -198,6 +192,7 @@ interface NutritionWithBreakdown {
  * per-100g values so the client can recalculate when quantities change.
  */
 export async function calculateNutritionWithBreakdown(
+  supabase: SupabaseClient,
   ingredients: IngredientInput[],
   servings: number
 ): Promise<NutritionWithBreakdown> {
@@ -212,7 +207,7 @@ export async function calculateNutritionWithBreakdown(
 
     const results = await Promise.all(
       batch.map(async (ing) => {
-        const per100g = await searchUSDAFood(ing.name);
+        const per100g = await searchUSDAFoodCached(supabase, ing.name);
         if (!per100g) return null;
 
         const grams = convertToGrams(ing.quantity, ing.unit);
